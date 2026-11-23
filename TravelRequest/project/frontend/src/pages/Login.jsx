@@ -1,15 +1,65 @@
 import { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Mail, Lock, LogIn, Plane, ChevronRight, ShieldCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plane, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+// ── Shining Animated Stars Configurations (Slow & Gentle Ambient Twinkle) ────
+const SHINING_SPARKLES = [
+    { top: '7%', left: '10%', size: 22, duration: 6.5, delay: 0 },
+    { top: '14%', left: '26%', size: 16, duration: 8.0, delay: 2.5 },
+    { top: '20%', left: '6%', size: 26, duration: 9.0, delay: 1.0 },
+    { top: '32%', left: '46%', size: 18, duration: 7.2, delay: 4.0 },
+    { top: '48%', left: '14%', size: 24, duration: 8.5, delay: 1.8 },
+    { top: '64%', left: '30%', size: 16, duration: 6.8, delay: 3.2 },
+    { top: '76%', left: '8%', size: 20, duration: 9.5, delay: 2.0 },
+    { top: '84%', left: '40%', size: 22, duration: 7.0, delay: 0.8 },
+    { top: '9%', left: '66%', size: 18, duration: 7.8, delay: 2.2 },
+    { top: '16%', left: '90%', size: 24, duration: 8.8, delay: 4.5 },
+    { top: '70%', left: '86%', size: 18, duration: 7.4, delay: 1.5 },
+    { top: '86%', left: '74%', size: 20, duration: 9.2, delay: 3.5 },
+];
+
+const TWINKLE_STARS = [
+    { top: '4%', left: '20%', size: 4, duration: 5.2, delay: 0.5 },
+    { top: '11%', left: '38%', size: 3, duration: 6.8, delay: 2.4 },
+    { top: '18%', left: '16%', size: 5, duration: 6.0, delay: 1.2 },
+    { top: '26%', left: '3%', size: 3, duration: 7.5, delay: 3.8 },
+    { top: '36%', left: '22%', size: 4, duration: 6.2, delay: 1.8 },
+    { top: '42%', left: '3%', size: 3, duration: 7.0, delay: 0.9 },
+    { top: '54%', left: '20%', size: 4, duration: 5.8, delay: 3.2 },
+    { top: '66%', left: '10%', size: 5, duration: 7.8, delay: 2.1 },
+    { top: '74%', left: '26%', size: 3, duration: 5.5, delay: 4.2 },
+    { top: '80%', left: '3%', size: 4, duration: 7.2, delay: 2.8 },
+    { top: '90%', left: '18%', size: 3, duration: 6.4, delay: 1.0 },
+    { top: '5%', left: '80%', size: 4, duration: 6.0, delay: 1.7 },
+    { top: '24%', left: '94%', size: 3, duration: 7.6, delay: 3.4 },
+    { top: '38%', left: '86%', size: 4, duration: 5.4, delay: 4.6 },
+    { top: '58%', left: '92%', size: 3, duration: 6.9, delay: 0.7 },
+    { top: '78%', left: '94%', size: 4, duration: 6.3, delay: 3.6 },
+];
 
 const Login = () => {
     const [credentials, setCredentials] = useState({ email: '', password: '' });
+    const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [ripples, setRipples] = useState([]);
     const { login } = useContext(AuthContext);
     const navigate = useNavigate();
+
+    const handleButtonClick = (e) => {
+        const button = e.currentTarget;
+        const rect = button.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height) * 1.5;
+        const x = e.clientX - rect.left - size / 2;
+        const y = e.clientY - rect.top - size / 2;
+        const newRipple = { x, y, size, id: Date.now() + Math.random() };
+        setRipples((prev) => [...prev, newRipple]);
+        setTimeout(() => {
+            setRipples((prev) => prev.filter((r) => r.id !== newRipple.id));
+        }, 700);
+    };
 
     const handleChange = (e) => {
         setCredentials({ ...credentials, [e.target.name]: e.target.value });
@@ -20,15 +70,14 @@ const Login = () => {
         setIsLoading(true);
         try {
             const userData = await login(credentials.email, credentials.password);
-            toast.success('Welcome back to TravelRequest!', {
-                icon: '👋',
-                style: { borderRadius: '15px', background: '#fff', color: '#000' }
+            toast.success('Welcome back to Nikitha Travel Request!', {
+                icon: '✈️',
+                style: { borderRadius: '15px', background: '#fff', color: '#6541e9', fontWeight: 600 }
             });
-            // Navigate directly using role from API response — avoids React state update race condition
             const role = userData?.role;
-            if (role === 'ROLE_ADMIN') navigate('/admin');
-            else if (role === 'ROLE_MANAGER') navigate('/manager');
-            else navigate('/employee');
+            if (role === 'ROLE_ADMIN') navigate('/admin', { replace: true });
+            else if (role === 'ROLE_MANAGER') navigate('/manager', { replace: true });
+            else navigate('/employee', { replace: true });
         } catch (error) {
             console.error('Login error:', error);
             toast.error(error.toString());
@@ -38,103 +87,497 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-[calc(100vh-80px)] flex bg-slate-50">
-            <div className="flex w-full max-w-[1400px] mx-auto m-6 bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-white">
-                {/* Visual Side */}
+        <div
+            className="w-full flex-grow min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-10 py-6 sm:py-8 relative overflow-x-hidden overflow-y-auto"
+            style={{
+                background: 'linear-gradient(135deg, #2a1e80 0%, #462ebc 28%, #6742db 50%, #9e59be 75%, #df8785 100%)',
+            }}
+        >
+            {/* ═══════════ ANIMATED BACKGROUND ATMOSPHERE ═══════════ */}
+            {/* Soft glowing cloud-like bokeh orbs drifting across sky */}
+            <motion.div
+                className="absolute top-12 right-1/4 w-[420px] h-[340px] rounded-full pointer-events-none"
+                style={{
+                    background: 'radial-gradient(circle, rgba(255, 255, 255, 0.22) 0%, rgba(200, 180, 255, 0.12) 50%, transparent 70%)',
+                    filter: 'blur(60px)',
+                }}
+                animate={{
+                    x: [0, 35, -20, 0],
+                    y: [0, -25, 15, 0],
+                    scale: [1, 1.1, 0.95, 1],
+                }}
+                transition={{
+                    duration: 14,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                }}
+            />
+
+            <motion.div
+                className="absolute -bottom-20 right-10 w-[500px] h-[400px] rounded-full pointer-events-none"
+                style={{
+                    background: 'radial-gradient(circle, rgba(254, 205, 190, 0.35) 0%, rgba(223, 136, 132, 0.18) 50%, transparent 75%)',
+                    filter: 'blur(75px)',
+                }}
+                animate={{
+                    x: [0, -40, 25, 0],
+                    y: [0, 20, -20, 0],
+                    scale: [1, 1.08, 0.96, 1],
+                }}
+                transition={{
+                    duration: 16,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                }}
+            />
+
+            <motion.div
+                className="absolute top-1/3 left-10 w-[450px] h-[380px] rounded-full pointer-events-none"
+                style={{
+                    background: 'radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, rgba(99, 102, 241, 0.12) 50%, transparent 70%)',
+                    filter: 'blur(80px)',
+                }}
+                animate={{
+                    x: [0, 30, -30, 0],
+                    y: [0, -30, 20, 0],
+                }}
+                transition={{
+                    duration: 18,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                }}
+            />
+
+            {/* ═══════════ SHINING ANIMATED STARS & CONSTELLATIONS ═══════════ */}
+            {/* Global Star Gradient Definition */}
+            <svg className="absolute w-0 h-0 pointer-events-none" aria-hidden="true">
+                <defs>
+                    <radialGradient id="starGleamLogin" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
+                        <stop offset="35%" stopColor="#fff8db" stopOpacity="0.95" />
+                        <stop offset="70%" stopColor="#fef08a" stopOpacity="0.6" />
+                        <stop offset="100%" stopColor="#ffffff" stopOpacity="0.1" />
+                    </radialGradient>
+                </defs>
+            </svg>
+
+            {/* 1. Large 4-Point Sparkling Stars with Diamond Glow Rays */}
+            {SHINING_SPARKLES.map((star, idx) => (
                 <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="hidden lg:flex lg:w-1/2 hero-bg flex-col justify-center px-16 text-white relative"
+                    key={`sparkle-${idx}`}
+                    className="absolute pointer-events-none select-none"
+                    style={{
+                        top: star.top,
+                        left: star.left,
+                        width: star.size,
+                        height: star.size,
+                    }}
+                    initial={{ opacity: 0.15, scale: 0.6 }}
+                    animate={{
+                        opacity: [0.15, 0.9, 0.15],
+                        scale: [0.6, 1.25, 0.6],
+                        rotate: [0, 15, 0],
+                    }}
+                    transition={{
+                        duration: star.duration,
+                        repeat: Infinity,
+                        delay: star.delay,
+                        ease: 'easeInOut',
+                    }}
                 >
-                    <div className="relative z-10">
-                        <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ delay: 0.2 }}
-                            className="bg-white/20 backdrop-blur-xl p-5 rounded-[2rem] w-fit mb-8 border border-white/30"
-                        >
-                            <Plane className="w-12 h-12 text-white transform -rotate-12" />
-                        </motion.div>
-                        <h1 className="text-7xl font-black mb-6 tracking-tighter leading-[0.9] text-white drop-shadow-2xl">
-                            Experience Travel Like Never Before. <br /><span className="text-white/70"></span>
-                        </h1>
-                        <p className="text-xl text-indigo-50 font-medium max-w-sm leading-relaxed opacity-90 border-l-4 border-indigo-400 pl-6">
-                            A smarter approach to business travel starts here.
-                        </p>
-                    </div>
-                </motion.div>
-
-                {/* Right Side - Login Form */}
-                <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
-                    <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="w-full max-w-md"
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        className="w-full h-full drop-shadow-[0_0_10px_rgba(255,255,255,0.95)]"
                     >
-                        <div className="mb-10 text-center lg:text-left">
-                            <h2 className="text-5xl font-black text-slate-900 mb-3 tracking-tighter">WelCome To TravelRequest</h2>
-                            <p className="text-slate-500 font-bold text-lg">Login to your account</p>
-                        </div>
+                        <path
+                            d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z"
+                            fill="url(#starGleamLogin)"
+                        />
+                        <circle cx="12" cy="12" r="3" fill="#ffffff" />
+                    </svg>
+                </motion.div>
+            ))}
 
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6366f1] ml-1">Work Email</label>
-                                <div className="relative group">
-                                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-[#6366f1] transition-all" />
+            {/* 2. Twinkling Night Sky Stars with Luminous Halos */}
+            {TWINKLE_STARS.map((star, idx) => (
+                <motion.div
+                    key={`twinkle-${idx}`}
+                    className="absolute rounded-full pointer-events-none"
+                    style={{
+                        top: star.top,
+                        left: star.left,
+                        width: `${star.size}px`,
+                        height: `${star.size}px`,
+                        backgroundColor: '#ffffff',
+                        boxShadow: `0 0 ${star.size * 2.5}px ${star.size * 0.8}px rgba(255, 255, 255, 0.9)`,
+                    }}
+                    animate={{
+                        opacity: [0.15, 0.85, 0.15],
+                        scale: [0.75, 1.35, 0.75],
+                    }}
+                    transition={{
+                        duration: star.duration,
+                        repeat: Infinity,
+                        delay: star.delay,
+                        ease: 'easeInOut',
+                    }}
+                />
+            ))}
+
+            {/* 3. Occasional Shooting Star Meteor Trails */}
+            <motion.div
+                className="absolute pointer-events-none"
+                style={{
+                    top: '12%',
+                    left: '18%',
+                    width: '130px',
+                    height: '2px',
+                    transform: 'rotate(-28deg)',
+                    background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.85) 65%, rgba(255,255,255,1) 100%)',
+                    filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.9))',
+                }}
+                animate={{
+                    x: [-80, 520],
+                    y: [-40, 270],
+                    opacity: [0, 1, 0.8, 0],
+                }}
+                transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    repeatDelay: 8,
+                    ease: 'easeOut',
+                }}
+            />
+
+            <motion.div
+                className="absolute pointer-events-none"
+                style={{
+                    top: '26%',
+                    left: '6%',
+                    width: '100px',
+                    height: '2px',
+                    transform: 'rotate(-32deg)',
+                    background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.85) 65%, rgba(255,255,255,1) 100%)',
+                    filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.9))',
+                }}
+                animate={{
+                    x: [-60, 420],
+                    y: [-30, 220],
+                    opacity: [0, 1, 0.8, 0],
+                }}
+                transition={{
+                    duration: 1.3,
+                    repeat: Infinity,
+                    repeatDelay: 12,
+                    delay: 4.5,
+                    ease: 'easeOut',
+                }}
+            />
+
+            {/* Additional Meteor Streak (Vivid across Dark Mode Sky) */}
+            <motion.div
+                className="absolute pointer-events-none"
+                style={{
+                    top: '16%',
+                    right: '12%',
+                    width: '125px',
+                    height: '2px',
+                    transform: 'rotate(-35deg)',
+                    background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 65%, rgba(255,255,255,1) 100%)',
+                    filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.95))',
+                }}
+                animate={{
+                    x: [40, -420],
+                    y: [-25, 260],
+                    opacity: [0, 1, 0.8, 0],
+                }}
+                transition={{
+                    duration: 1.4,
+                    repeat: Infinity,
+                    repeatDelay: 10,
+                    delay: 6.5,
+                    ease: 'easeOut',
+                }}
+            />
+
+            {/* ═══════════ MAIN CONTENT CONTAINER ═══════════ */}
+            <div className="w-full max-w-6xl mx-auto grid lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10">
+
+                {/* ────────── LEFT COLUMN: HERO & ANIMATED FLIGHT PATH ────────── */}
+                <div className="lg:col-span-7 text-white relative">
+                    {/* Animated Flight Path with Gliding Plane */}
+                    <div className="relative mb-6 sm:mb-8 h-16 sm:h-20 max-w-md">
+                        {/* Glowing Flight Contrail Line */}
+                        <svg className="w-full h-full overflow-visible" viewBox="0 0 400 80" fill="none">
+                            <motion.path
+                                d="M 10 65 Q 160 55, 330 25"
+                                stroke="url(#contrailGradient)"
+                                strokeWidth="2.5"
+                                strokeDasharray="6 6"
+                                initial={{ pathLength: 0, opacity: 0 }}
+                                animate={{ pathLength: 1, opacity: 0.85 }}
+                                transition={{ duration: 1.5, ease: 'easeOut' }}
+                            />
+                            <defs>
+                                <linearGradient id="contrailGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.1" />
+                                    <stop offset="60%" stopColor="#ffffff" stopOpacity="0.6" />
+                                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+
+                        {/* Gliding Airplane on the flight path with smooth banking */}
+                        <motion.div
+                            className="absolute top-0"
+                            style={{ left: '80%', top: '18%' }}
+                            animate={{
+                                x: [0, 8, -6, 0],
+                                y: [0, -5, 4, 0],
+                                rotate: [35, 38, 33, 35],
+                            }}
+                            transition={{
+                                duration: 5,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                            }}
+                        >
+                            <div className="relative">
+                                {/* Plane glow aura */}
+                                <div className="absolute inset-0 bg-white/40 blur-md rounded-full scale-150 pointer-events-none" />
+                                <Plane className="w-6 h-6 text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.7)]" />
+                            </div>
+                        </motion.div>
+                    </div>
+
+                    {/* Brand Badge: [ ✈ ] Nikitha Travel Request */}
+                    <motion.div
+                        initial={{ opacity: 0, x: -30 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.6, ease: 'easeOut' }}
+                        className="inline-flex items-center gap-3 px-3.5 py-2 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 shadow-lg mb-8 hover:bg-white/20 transition-all cursor-default"
+                    >
+                        <motion.div
+                            className="p-2 rounded-xl bg-[#6541e9] text-white shadow-md flex items-center justify-center"
+                            animate={{ rotate: [0, -6, 0] }}
+                            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                        >
+                            <Plane className="w-4 h-4 text-white transform -rotate-45" />
+                        </motion.div>
+                        <span className="text-sm font-bold text-white tracking-wide pr-2">
+                            Nikitha Travel Request
+                        </span>
+                    </motion.div>
+
+                    {/* Hero Headline: Your next trip starts here. */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 25 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.7, delay: 0.15, ease: 'easeOut' }}
+                    >
+                        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-white tracking-tight leading-[1.05] drop-shadow-md">
+                            Your next trip
+                            <br />
+                            <span className="text-white">starts here.</span>
+                        </h1>
+                    </motion.div>
+
+                    {/* Subtitle */}
+                    <motion.p
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.7, delay: 0.3, ease: 'easeOut' }}
+                        className="mt-6 text-base sm:text-lg text-white/85 font-normal leading-relaxed max-w-lg"
+                    >
+                        Request, approve and track business travel without the back and forth.
+                    </motion.p>
+                </div>
+
+                {/* ────────── RIGHT COLUMN: FLOATING ANIMATED LOGIN CARD ────────── */}
+                <div className="lg:col-span-5 flex justify-center lg:justify-end">
+                    <motion.div
+                        initial={{ opacity: 0, y: 40, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.65, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                        className="w-full max-w-[430px]"
+                    >
+                        {/* Floating Ambient Card with subtle continuous idle float */}
+                        <motion.div
+                            animate={{ y: [0, -8, 0] }}
+                            transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                            className="bg-white/95 backdrop-blur-2xl rounded-[2.2rem] p-8 sm:p-10 shadow-[0_25px_70px_-15px_rgba(20,10,60,0.4)] border border-white/60 relative overflow-hidden"
+                        >
+                            {/* Subtle internal shine */}
+                            <div className="absolute top-0 right-0 w-44 h-44 rounded-full bg-gradient-to-bl from-indigo-50/80 to-transparent pointer-events-none" />
+
+                            {/* Nikitha Official Logo - Blended seamlessly with login card */}
+                            <div className="flex justify-center mb-5 sm:mb-6 relative z-10">
+                                <motion.div
+                                    whileHover={{ scale: 1.03 }}
+                                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                                    className="flex items-center justify-center"
+                                >
+                                    <img
+                                        src="/nikitha-logo.png"
+                                        alt="Nikitha Logo"
+                                        className="h-20 sm:h-24 w-auto object-contain select-none"
+                                    />
+                                </motion.div>
+                            </div>
+
+                            {/* Card Header */}
+                            <div className="mb-7 relative z-10">
+                                <h2 className="text-3xl font-extrabold text-[#1e1b4b] tracking-tight">
+                                    Welcome back
+                                </h2>
+                                <p className="text-sm font-medium text-slate-500 mt-1">
+                                    Log in to your account
+                                </p>
+                            </div>
+
+                            {/* Form */}
+                            <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
+                                {/* Work Email Field */}
+                                <div className="space-y-1.5">
+                                    <label className="block text-[11px] font-black uppercase tracking-wider text-[#6541e9]">
+                                        WORK EMAIL
+                                    </label>
                                     <input
                                         type="email"
                                         name="email"
                                         value={credentials.email}
                                         onChange={handleChange}
-                                        placeholder="Gmail"
-                                        className="mmt-input pl-16 py-5"
+                                        placeholder="name@company.com"
+                                        className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200/90 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#6541e9] focus:ring-4 focus:ring-[#6541e9]/15 transition-all outline-none"
                                         required
                                     />
                                 </div>
-                            </div>
 
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between ml-1">
-                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6366f1]">Password</label>
-                                    <Link to="/forgot-password" className="text-[10px] font-black text-[#6366f1] uppercase tracking-widest hover:underline">Forgot?</Link>
+                                {/* Password Field with SHOW/HIDE */}
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                        <label className="block text-[11px] font-black uppercase tracking-wider text-[#6541e9]">
+                                            PASSWORD
+                                        </label>
+                                        <Link
+                                            to="/forgot-password"
+                                            className="text-[11px] font-black uppercase tracking-wider text-[#6541e9] hover:underline"
+                                        >
+                                            FORGOT?
+                                        </Link>
+                                    </div>
+                                    <div className="relative">
+                                        <input
+                                            type={showPassword ? 'text' : 'password'}
+                                            name="password"
+                                            value={credentials.password}
+                                            onChange={handleChange}
+                                            placeholder="Enter your password"
+                                            className="w-full pl-4 pr-12 py-3 rounded-xl bg-white border border-slate-200/90 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#6541e9] focus:ring-4 focus:ring-[#6541e9]/15 transition-all outline-none"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#6541e9] p-1 transition-colors"
+                                            title={showPassword ? 'Hide password' : 'Show password'}
+                                        >
+                                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="relative group">
-                                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-[#6366f1] transition-all" />
-                                    <input
-                                        type="password"
-                                        name="password"
-                                        value={credentials.password}
-                                        onChange={handleChange}
-                                        placeholder="************"
-                                        className="mmt-input pl-16 py-5"
-                                        required
+
+                                {/* Log in Primary Button - Nikitha Logo Colors Gradient & Micro-Animations */}
+                                <div className="relative group mt-2">
+                                    {/* Ambient Logo Gradient Glow Aura */}
+                                    <div
+                                        className="absolute -inset-1 rounded-2xl opacity-50 group-hover:opacity-90 blur-lg transition-all duration-500 pointer-events-none -z-10"
+                                        style={{
+                                            background: 'linear-gradient(135deg, rgba(203, 15, 65, 0.7) 0%, rgba(133, 34, 120, 0.6) 45%, rgba(0, 105, 163, 0.7) 100%)',
+                                        }}
                                     />
+
+                                    <motion.button
+                                        type="submit"
+                                        disabled={isLoading}
+                                        onClick={handleButtonClick}
+                                        whileHover={{
+                                             scale: 1.025,
+                                             y: -2,
+                                        }}
+                                        whileTap={{
+                                             scale: 0.95,
+                                             y: 1,
+                                        }}
+                                        transition={{
+                                             type: 'spring',
+                                             stiffness: 450,
+                                             damping: 22,
+                                        }}
+                                        className="relative w-full py-3.5 px-6 rounded-xl text-white font-bold text-sm overflow-hidden flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed select-none"
+                                        style={{
+                                             background: 'linear-gradient(120deg, #cb0f41 0%, #d8164b 25%, #852278 55%, #0069a3 85%, #0284c7 100%)',
+                                             backgroundSize: '200% 100%',
+                                             boxShadow: '0 10px 25px -4px rgba(203, 15, 65, 0.38), 0 8px 20px -4px rgba(0, 105, 163, 0.32)',
+                                             transition: 'background-position 0.6s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                             e.currentTarget.style.backgroundPosition = '100% 0%';
+                                             e.currentTarget.style.boxShadow = '0 16px 35px -6px rgba(203, 15, 65, 0.45), 0 12px 28px -6px rgba(0, 105, 163, 0.4)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                             e.currentTarget.style.backgroundPosition = '0% 0%';
+                                             e.currentTarget.style.boxShadow = '0 10px 25px -4px rgba(203, 15, 65, 0.38), 0 8px 20px -4px rgba(0, 105, 163, 0.32)';
+                                        }}
+                                    >
+                                        {/* Shimmer Light Reflection Sweep on Hover */}
+                                        <motion.div
+                                            className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-25deg] pointer-events-none"
+                                            initial={{ left: '-100%' }}
+                                            whileHover={{ left: '160%' }}
+                                            transition={{ duration: 0.85, ease: 'easeInOut' }}
+                                        />
+
+                                        {/* Click Ripple Waves */}
+                                        {ripples.map((ripple) => (
+                                            <motion.span
+                                                key={ripple.id}
+                                                initial={{ scale: 0, opacity: 0.65 }}
+                                                animate={{ scale: 2.2, opacity: 0 }}
+                                                transition={{ duration: 0.65, ease: 'easeOut' }}
+                                                className="absolute bg-white/40 rounded-full pointer-events-none"
+                                                style={{
+                                                     left: ripple.x,
+                                                     top: ripple.y,
+                                                     width: ripple.size,
+                                                     height: ripple.size,
+                                                }}
+                                            />
+                                        ))}
+
+                                        {isLoading ? (
+                                            <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin relative z-10" />
+                                        ) : (
+                                            <span className="relative z-10 tracking-wide font-bold drop-shadow-sm flex items-center gap-2">
+                                                Log in
+                                            </span>
+                                        )}
+                                    </motion.button>
                                 </div>
-                            </div>
+                            </form>
 
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full btn-mmt-primary py-6 text-xl tracking-tighter"
-                            >
-                                {isLoading ? (
-                                    <div className="h-7 w-7 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                ) : (
-                                    <>
-                                        <span>Login</span>
-                                        <ChevronRight className="h-6 w-6" />
-                                    </>
-                                )}
-                            </button>
-                        </form>
-
-                        <div className="mt-12 pt-8 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                            <p className="text-slate-500 font-medium text-sm">
-                                Register <Link to="/register" className="text-[#008cff] font-bold hover:underline">SignUp</Link>
-                            </p>
-                            <div className="flex items-center gap-3 text-emerald-500 bg-emerald-50 px-4 py-2 rounded-full">
+                            {/* Bottom Footer: New here? Create an account */}
+                            <div className="mt-7 text-center text-xs font-medium text-slate-500 relative z-10">
+                                New here?{' '}
+                                <Link
+                                    to="/register"
+                                    className="text-[#6541e9] font-bold hover:underline"
+                                >
+                                    Create an account
+                                </Link>
                             </div>
-                        </div>
+                        </motion.div>
                     </motion.div>
                 </div>
             </div>

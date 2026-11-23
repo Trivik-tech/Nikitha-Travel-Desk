@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
 import {
     Plane,
@@ -8,38 +8,74 @@ import {
     Ticket,
     Search,
     CheckCircle,
+    CheckCircle2,
+    XCircle,
     IndianRupee,
     ArrowRight,
     Clock,
     BarChart2,
     Users,
-    Plus,
     User,
-    Hash,
-    Building,
-    ClipboardCheck,
     Calendar,
     MapPin,
     ShieldCheck,
-    Globe
+    RefreshCw,
+    X,
+    FileText,
+    Download,
+    TrendingUp,
+    Sparkles,
+    PlaneTakeoff,
+    ExternalLink,
+    ChevronRight,
+    ChevronLeft,
+    Briefcase,
+    Train,
+    Bus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { AuthContext } from '../context/AuthContext';
 
+// ── Shining Animated Stars Configurations (Slow & Gentle Ambient Twinkle) ────
+const HERO_SPARKLES = [
+    { top: '15%', left: '8%', size: 20, duration: 6.5, delay: 0 },
+    { top: '22%', left: '48%', size: 16, duration: 7.8, delay: 2.2 },
+    { top: '18%', left: '82%', size: 22, duration: 8.5, delay: 1.2 },
+    { top: '45%', left: '92%', size: 18, duration: 7.0, delay: 3.5 },
+    { top: '70%', left: '68%', size: 16, duration: 6.8, delay: 1.8 },
+];
+
+const HERO_TWINKLE = [
+    { top: '8%', left: '22%', size: 4, duration: 5.2, delay: 0.5 },
+    { top: '28%', left: '35%', size: 3, duration: 6.8, delay: 2.4 },
+    { top: '12%', left: '65%', size: 4, duration: 6.0, delay: 1.2 },
+    { top: '38%', left: '76%', size: 3, duration: 7.5, delay: 3.8 },
+    { top: '55%', left: '88%', size: 4, duration: 5.8, delay: 1.5 },
+    { top: '65%', left: '42%', size: 3, duration: 6.4, delay: 2.8 },
+];
+
 const AdminDashboard = () => {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { user } = useContext(AuthContext);
 
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedReq, setSelectedReq] = useState(null);
 
+    // Filter & Tab states
+    const [activeTab, setActiveTab] = useState('QUEUE'); // 'QUEUE' | 'DISPATCHED' | 'ALL'
+    const [searchTerm, setSearchTerm] = useState('');
+    const [modeFilter, setModeFilter] = useState('ALL');
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 6;
+
     const [bookingData, setBookingData] = useState({
         cost: ''
     });
-
-
 
     const [ticketFile, setTicketFile] = useState(null);
     const [returnTicketFile, setReturnTicketFile] = useState(null);
@@ -49,7 +85,7 @@ const AdminDashboard = () => {
         try {
             setLoading(true);
             const res = await api.get('/requests');
-            setRequests(res.data);
+            setRequests(res.data || []);
         } catch (error) {
             console.error('Failed to fetch requests', error);
             toast.error('Failed to load system inventory');
@@ -58,8 +94,6 @@ const AdminDashboard = () => {
         }
     };
 
-    // Removed fetchUsers (migrated to UserManagement.jsx)
-
     useEffect(() => {
         if (!user?.accessToken) {
             navigate('/login');
@@ -67,6 +101,24 @@ const AdminDashboard = () => {
         }
         fetchRequests();
     }, [user?.accessToken, navigate]);
+
+    // Sync selectedReq with URL search params (?ticket=...)
+    useEffect(() => {
+        const ticketId = searchParams.get('ticket');
+        if (ticketId && requests.length > 0) {
+            const found = requests.find(r => String(r.id) === ticketId);
+            if (found) {
+                setSelectedReq(found);
+            }
+        } else if (!ticketId) {
+            setSelectedReq(null);
+        }
+    }, [searchParams, requests]);
+
+    // Reset pagination to page 1 when tab, search, or filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab, searchTerm, modeFilter]);
 
     useEffect(() => {
         if (!selectedReq) {
@@ -80,6 +132,155 @@ const AdminDashboard = () => {
             cost: selectedReq.cost ? String(selectedReq.cost) : '',
         });
     }, [selectedReq]);
+
+    const handleSelectTicket = (req) => {
+        setSelectedReq(req);
+        setSearchParams({ ticket: String(req.id) });
+        const el = document.getElementById('admin-workspace-card');
+        if (el) {
+            const rect = el.getBoundingClientRect();
+            if (rect.top < 70) {
+                const navbarHeight = 85;
+                const targetY = window.pageYOffset + rect.top - navbarHeight;
+                window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+            }
+        }
+    };
+
+    const handleBackToList = () => {
+        setSelectedReq(null);
+        setSearchParams({});
+        const el = document.getElementById('admin-workspace-card');
+        if (el) {
+            const rect = el.getBoundingClientRect();
+            if (rect.top < 70) {
+                const navbarHeight = 85;
+                const targetY = window.pageYOffset + rect.top - navbarHeight;
+                window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+            }
+        }
+    };
+
+    const getMakeMyTripUrl = (req) => {
+        if (!req) return 'https://www.makemytrip.com/flights/';
+        
+        const extractCode = (str) => {
+            if (!str) return '';
+            const match = str.match(/\b([A-Z]{3})\b/);
+            if (match) return match[1];
+            
+            const lower = str.toLowerCase();
+            if (lower.includes('delhi')) return 'DEL';
+            if (lower.includes('mumbai') || lower.includes('bombay')) return 'BOM';
+            if (lower.includes('bangalore') || lower.includes('bengaluru')) return 'BLR';
+            if (lower.includes('chennai') || lower.includes('madras')) return 'MAA';
+            if (lower.includes('kolkata') || lower.includes('calcutta')) return 'CCU';
+            if (lower.includes('hyderabad')) return 'HYD';
+            if (lower.includes('pune')) return 'PNQ';
+            if (lower.includes('ahmedabad')) return 'AMD';
+            if (lower.includes('goa')) return 'GOI';
+            if (lower.includes('jaipur')) return 'JAI';
+            if (lower.includes('kochi') || lower.includes('cochin')) return 'COK';
+            if (lower.includes('dubai')) return 'DXB';
+            if (lower.includes('singapore')) return 'SIN';
+            if (lower.includes('london')) return 'LHR';
+            if (lower.includes('paris')) return 'CDG';
+            return '';
+        };
+
+        const fromCode = extractCode(req.fromLocation);
+        const toCode = extractCode(req.toLocation);
+
+        if (req.departureDate && fromCode && toCode) {
+            try {
+                const d = new Date(req.departureDate);
+                if (!Number.isNaN(d.getTime())) {
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const year = d.getFullYear();
+                    const formattedDate = `${day}/${month}/${year}`;
+                    
+                    if (req.tripType === 'round-trip' && req.returnDate) {
+                        const rd = new Date(req.returnDate);
+                        const rDay = String(rd.getDate()).padStart(2, '0');
+                        const rMonth = String(rd.getMonth() + 1).padStart(2, '0');
+                        const rYear = rd.getFullYear();
+                        const formattedReturnDate = `${rDay}/${rMonth}/${rYear}`;
+                        return `https://www.makemytrip.com/flight/search?itinerary=${fromCode}-${toCode}-${formattedDate}_${toCode}-${fromCode}-${formattedReturnDate}&tripType=R&paxType=A-1_C-0_I-0&intl=false&cabinClass=E`;
+                    }
+                    return `https://www.makemytrip.com/flight/search?itinerary=${fromCode}-${toCode}-${formattedDate}&tripType=O&paxType=A-1_C-0_I-0&intl=false&cabinClass=E`;
+                }
+            } catch (e) {
+                console.error('Error generating MakeMyTrip deep link', e);
+            }
+        }
+
+        return 'https://www.makemytrip.com/flights/';
+    };
+
+    const getBookingPortalConfig = (req) => {
+        const mode = (req?.travelMode || 'Flight').toLowerCase();
+
+        if (mode === 'bus') {
+            const toSlug = (s) => {
+                if (!s) return '';
+                const city = s.split(',')[0].replace(/\(.*?\)/g, '').trim().toLowerCase();
+                return city.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            };
+            const fromSlug = toSlug(req?.fromLocation);
+            const toSlugCity = toSlug(req?.toLocation);
+            const url = fromSlug && toSlugCity
+                ? `https://www.redbus.in/bus-tickets/${fromSlug}-to-${toSlugCity}`
+                : 'https://www.redbus.in/';
+            return {
+                name: 'redBus',
+                tag: 'redBus',
+                title: 'Book on redBus',
+                subtitle: 'Search intercity buses & download confirmed ticket',
+                description: 'Click below to search & book this bus journey directly on redBus. Once booked, download the e-ticket PDF and upload it in Step 2 below.',
+                buttonText: 'Open redBus to Book Ticket',
+                url: url,
+                icon: Bus,
+                gradient: 'from-[#d84e55] via-[#d81b24] to-[#a3121b]',
+                badgeBg: 'bg-rose-100 text-[#d84e55]',
+                cardBg: 'from-rose-50 via-white to-amber-50 border-rose-200/80',
+                uploadLabel: 'Upload redBus E-Ticket'
+            };
+        }
+
+        if (mode === 'train') {
+            return {
+                name: 'IRCTC',
+                tag: 'IRCTC',
+                title: 'Book on IRCTC Official Portal',
+                subtitle: 'Search Indian Railways trains & download confirmed ticket',
+                description: 'Click below to search & book this train journey directly on the official IRCTC portal. Once booked, download the e-ticket PDF and upload it in Step 2 below.',
+                buttonText: 'Open IRCTC to Book Ticket',
+                url: 'https://www.irctc.co.in/nget/train-search',
+                icon: Train,
+                gradient: 'from-[#0f3b7a] via-[#1a56db] to-[#0284c7]',
+                badgeBg: 'bg-blue-100 text-[#0f3b7a]',
+                cardBg: 'from-blue-50 via-white to-sky-50 border-blue-200/80',
+                uploadLabel: 'Upload IRCTC E-Ticket'
+            };
+        }
+
+        // Default: Flight -> MakeMyTrip
+        return {
+            name: 'MakeMyTrip',
+            tag: 'MMT',
+            title: 'Book on MakeMyTrip',
+            subtitle: 'Search flights & download confirmed ticket',
+            description: 'Click below to search & book this flight directly on MakeMyTrip. Once booked, download the e-ticket PDF and upload it in Step 2 below.',
+            buttonText: 'Open MakeMyTrip to Book Ticket',
+            url: getMakeMyTripUrl(req),
+            icon: Plane,
+            gradient: 'from-[#e41b23] via-[#d8164b] to-[#0084ff]',
+            badgeBg: 'bg-rose-100 text-[#e41b23]',
+            cardBg: 'from-rose-50 via-white to-sky-50 border-rose-200/80',
+            uploadLabel: 'Upload MakeMyTrip E-Ticket'
+        };
+    };
 
     const handleBookTicket = async (e) => {
         e.preventDefault();
@@ -109,19 +310,14 @@ const AdminDashboard = () => {
             if (ticketFile) formData.append('file', ticketFile);
             if (returnTicketFile) formData.append('returnFile', returnTicketFile);
 
-            console.log('Dispatching fulfillment with token length:', token?.length);
-
             await api.post(`/requests/${selectedReq.id}/fulfillment`, formData, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
-            toast.success('Itinerary successfully booked!', { id: loadToast });
-            setSelectedReq(null);
-            setBookingData({ cost: '' });
-            setTicketFile(null);
-            setReturnTicketFile(null);
+            toast.success('Itinerary successfully booked and ticket dispatched!', { id: loadToast });
+            handleBackToList();
             fetchRequests();
         } catch (error) {
             console.error('CRITICAL: Fulfillment failed:', error);
@@ -129,17 +325,14 @@ const AdminDashboard = () => {
             const errorMsg = error.response?.data?.message || error.response?.data || error.message;
 
             if (status === 401) {
-                toast.error(`[DEBUG-AUTH] 401 DETECTED: ${errorMsg}`, { id: loadToast });
-                // navigate('/login'); 
+                toast.error(`Unauthorized: ${errorMsg}`, { id: loadToast });
                 return;
             }
-            toast.error(`[DEBUG-FAIL] ${errorMsg}`, { id: loadToast });
+            toast.error(`Fulfillment failed: ${errorMsg}`, { id: loadToast });
         } finally {
             setIsBooking(false);
         }
     };
-
-    // Removed handleRoleChange and saveUserRole (migrated to UserManagement.jsx)
 
     const approvedRequests = useMemo(() => requests.filter(r => r.status === 'APPROVED'), [requests]);
     const bookedRequests = useMemo(() => requests.filter(r => r.status === 'BOOKED'), [requests]);
@@ -177,6 +370,7 @@ const AdminDashboard = () => {
                 userStats[userId] = {
                     id: userId,
                     name: req.employee?.name || 'Unknown',
+                    email: req.employee?.email || '',
                     trips: 0,
                     cost: 0,
                     lastTravel: date,
@@ -203,460 +397,1157 @@ const AdminDashboard = () => {
         };
     }, [bookedRequests]);
 
+    // Filtered list based on active tab, search, and mode
+    const displayedRequests = useMemo(() => {
+        let baseList = [];
+        if (activeTab === 'QUEUE') baseList = approvedRequests;
+        else if (activeTab === 'DISPATCHED') baseList = bookedRequests;
+        else baseList = requests;
+
+        return baseList.filter(req => {
+            const matchesSearch = 
+                !searchTerm ||
+                req.employee?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                req.employee?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                req.fromLocation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                req.toLocation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                String(req.id).includes(searchTerm);
+
+            const matchesMode = 
+                modeFilter === 'ALL' ||
+                req.travelMode?.toLowerCase() === modeFilter.toLowerCase();
+
+            return matchesSearch && matchesMode;
+        });
+    }, [requests, approvedRequests, bookedRequests, activeTab, searchTerm, modeFilter]);
+
+    const totalAnnualSpend = useMemo(() => {
+        return allBookedRequests.reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
+    }, [allBookedRequests]);
+
+    const totalPages = Math.max(1, Math.ceil(displayedRequests.length / pageSize));
+    const paginatedRequests = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return displayedRequests.slice(start, start + pageSize);
+    }, [displayedRequests, currentPage, pageSize]);
+
     return (
-        <div className="pb-20">
-            {/* Header Section */}
-            <div className="hero-bg px-8 py-24 rounded-[3.5rem] text-white overflow-hidden relative shadow-2xl mb-12 border border-white/10">
-                <div className="relative z-10 max-w-4xl">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="bg-white/20 backdrop-blur-xl p-3 rounded-2xl w-fit mb-8 border border-white/30"
-                    >
-                        <ShieldCheck className="w-8 h-8 text-white" />
-                    </motion.div>
-                    <h1 className="text-7xl font-black tracking-tighter mb-6 leading-[0.9] text-white drop-shadow-2xl">
-                        Inventory & <br /><span className="text-white/60">Booking Control.</span>
-                    </h1>
-                    <p className="text-xl text-indigo-50 font-medium opacity-90 max-w-2xl leading-relaxed border-l-4 border-indigo-400 pl-8">
-                        Executive oversight for global ticket fulfillment. Securely finalize <span className="text-white font-bold">TravelRequest</span> itineraries in real-time.
-                    </p>
-                </div>
+        <div
+            className="w-full min-h-screen relative p-4 sm:p-6 lg:p-10 pt-6 sm:pt-8 lg:pt-10 pb-24 animate-fadeIn"
+            style={{
+                background: 'linear-gradient(135deg, #2a1e80 0%, #462ebc 28%, #6742db 50%, #9e59be 75%, #df8785 100%)',
+                backgroundAttachment: 'fixed',
+            }}
+        >
+            {/* ═══════════ FIXED ANIMATED BACKGROUND ATMOSPHERE ═══════════ */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+                {/* Soft glowing cloud-like bokeh orbs drifting across sky */}
+            <motion.div
+                className="absolute top-12 right-1/4 w-[420px] h-[340px] rounded-full pointer-events-none"
+                style={{
+                    background: 'radial-gradient(circle, rgba(255, 255, 255, 0.22) 0%, rgba(200, 180, 255, 0.12) 50%, transparent 70%)',
+                    filter: 'blur(60px)',
+                }}
+                animate={{
+                    x: [0, 35, -20, 0],
+                    y: [0, -25, 15, 0],
+                    scale: [1, 1.1, 0.95, 1],
+                }}
+                transition={{
+                    duration: 14,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                }}
+            />
+
+            <motion.div
+                className="absolute top-1/3 left-10 w-[450px] h-[380px] rounded-full pointer-events-none"
+                style={{
+                    background: 'radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, rgba(99, 102, 241, 0.12) 50%, transparent 70%)',
+                    filter: 'blur(80px)',
+                }}
+                animate={{
+                    x: [0, 30, -30, 0],
+                    y: [0, -30, 20, 0],
+                }}
+                transition={{
+                    duration: 18,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                }}
+            />
+
+            {/* Sparkling 4-Point Stars */}
+            {HERO_SPARKLES.map((star, idx) => (
+                <motion.div
+                    key={`hero-sparkle-${idx}`}
+                    className="absolute pointer-events-none select-none"
+                    style={{
+                        top: star.top,
+                        left: star.left,
+                        width: star.size,
+                        height: star.size,
+                    }}
+                    initial={{ opacity: 0.2, scale: 0.7 }}
+                    animate={{
+                        opacity: [0.2, 0.9, 0.2],
+                        scale: [0.7, 1.25, 0.7],
+                        rotate: [0, 12, 0],
+                    }}
+                    transition={{
+                        duration: star.duration,
+                        repeat: Infinity,
+                        delay: star.delay,
+                        ease: 'easeInOut',
+                    }}
+                >
+                    <svg viewBox="0 0 24 24" fill="none" className="w-full h-full drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]">
+                        <path
+                            d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z"
+                            fill="#ffffff"
+                        />
+                        <circle cx="12" cy="12" r="2.5" fill="#ffffff" />
+                    </svg>
+                </motion.div>
+            ))}
+
+            {/* Twinkling Halo Stars */}
+            {HERO_TWINKLE.map((star, idx) => (
+                <motion.div
+                    key={`hero-twinkle-${idx}`}
+                    className="absolute rounded-full pointer-events-none"
+                    style={{
+                        top: star.top,
+                        left: star.left,
+                        width: `${star.size}px`,
+                        height: `${star.size}px`,
+                        backgroundColor: '#ffffff',
+                        boxShadow: `0 0 ${star.size * 2.5}px ${star.size * 0.8}px rgba(255, 255, 255, 0.85)`,
+                    }}
+                    animate={{
+                        opacity: [0.2, 0.85, 0.2],
+                        scale: [0.8, 1.3, 0.8],
+                    }}
+                    transition={{
+                        duration: star.duration,
+                        repeat: Infinity,
+                        delay: star.delay,
+                        ease: 'easeInOut',
+                    }}
+                />
+            ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mt-12 container mx-auto px-4">
-                {/* Left List - Final Approvals */}
-                <div className="lg:col-span-2 space-y-10">
-                    <div className="bg-white rounded-[3rem] shadow-2xl shadow-indigo-500/5 border border-white overflow-hidden">
-                        <div className="bg-slate-50 px-10 py-8 border-b border-slate-100 flex items-center justify-between">
-                            <div className="flex items-center gap-5">
-                                <div className="mmt-gradient text-white rounded-[1.2rem] h-12 w-12 flex justify-center items-center shadow-xl shadow-indigo-500/20">
-                                    <span className="font-black text-lg">{approvedRequests.length}</span>
-                                </div>
-                                <div>
-                                    <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Queue</h2>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Pending Fulfillment</p>
-                                </div>
-                            </div>
-                        </div>
+            <div className="w-full max-w-7xl mx-auto relative z-10 space-y-6">
+                {/* ── 1. CORPORATE TICKETING DESK HEADER ─────────────────── */}
+                <div className="max-w-3xl">
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-sm mb-4"
+                    >
+                        CORPORATE TICKETING DESK
+                    </motion.div>
 
-                        <div className="p-8 space-y-4 max-h-[800px] overflow-y-auto custom-scrollbar">
-                            {loading ? (
-                                <div className="py-24 flex flex-col items-center gap-6">
-                                    <div className="w-16 h-16 border-4 border-indigo-500/20 border-t-[#6366f1] rounded-full animate-spin"></div>
-                                    <p className="text-slate-400 font-black uppercase tracking-[0.4em] text-[10px]">Syncing Global Node...</p>
-                                </div>
-                            ) : approvedRequests.length === 0 ? (
-                                <div className="text-center py-32 border-2 border-dashed border-slate-100 rounded-[2.5rem]">
-                                    <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-8">
-                                        <CheckCircle className="h-12 w-12 text-emerald-300" />
-                                    </div>
-                                    <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tighter">All Clear</h3>
-                                    <p className="text-slate-500 font-medium">No approved trips are waiting for booking.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-6">
-                                    {approvedRequests.map(req => (
-                                        <motion.div
-                                            key={req.id}
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            onClick={() => setSelectedReq(req)}
-                                            className={`p-8 rounded-[2.5rem] border-4 cursor-pointer group transition-all duration-500
-                                                ${selectedReq?.id === req.id
-                                                    ? 'border-[#6366f1] bg-indigo-50/50 shadow-2xl shadow-indigo-500/10'
-                                                    : 'border-slate-50 hover:border-indigo-100 bg-white'}`}
-                                        >
-                                            <div className="flex justify-between items-start mb-6">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="bg-slate-100 p-3 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-all transform group-hover:rotate-6">
-                                                        <User className="h-5 w-5" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-black text-slate-900 text-lg leading-none mb-1">{req.employee?.name}</p>
-                                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">ID: #{req.employee?.id}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="bg-white/80 p-5 rounded-2xl flex items-center justify-between mb-6 shadow-sm border border-slate-50">
-                                                <span className="font-black text-slate-800 text-sm max-w-[100px] truncate" title={req.fromLocation}>{req.fromLocation}</span>
-                                                <div className="flex flex-col items-center border-b-[1.5px] border-dashed border-indigo-200 w-20 relative">
-                                                    <Plane className={`h-4 w-4 text-indigo-400 absolute -top-2 ${req.tripType === 'round-trip' ? '' : 'translate-x-3'}`} />
-                                                    {req.tripType === 'round-trip' && (
-                                                        <Plane className="h-4 w-4 text-emerald-400 absolute -bottom-2 rotate-180 translate-x-3" />
-                                                    )}
-                                                </div>
-                                                <span className="font-black text-[#6366f1] text-sm text-right max-w-[100px] truncate" title={req.toLocation}>{req.toLocation}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                                        <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                                                        {new Date(req.departureDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                                    </div>
-                                                    {req.tripType === 'round-trip' && req.returnDate && (
-                                                        <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest">
-                                                            <Calendar className="w-3.5 h-3.5 text-emerald-500" />
-                                                            {new Date(req.returnDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <span className="text-[9px] font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md uppercase tracking-widest">
-                                                        {req.tripType === 'round-trip' ? 'Round Trip' : 'One Way'}
-                                                    </span>
-                                                    <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-[2rem] uppercase border border-emerald-100/50 animate-pulse">Wait-List</span>
-                                                </div>
-                                            </div>
+                    <motion.h1
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.1 }}
+                        className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.05] mb-3 drop-shadow-md"
+                    >
+                        Inventory &amp; Booking
+                        <br />
+                        <span className="text-white">Control.</span>
+                    </motion.h1>
 
-                                            {selectedReq?.id === req.id && (
-                                                <div className="mt-6 p-6 bg-white/70 rounded-2xl border border-indigo-100">
-                                                    <h4 className="text-sm font-black text-indigo-700 uppercase tracking-widest mb-3">Details</h4>
-                                                    <div className="grid grid-cols-1 gap-2 text-sm text-slate-600">
-                                                        <div className="flex justify-between">
-                                                            <span className="font-black">Purpose</span>
-                                                            <span className="text-right">{req.purpose || '—'}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="font-black">Cost</span>
-                                                            <span className="text-right">{req.cost ? `₹${req.cost}` : 'Pending'}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </motion.div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Ticket Dispatch Report */}
-                    <div className="bg-white rounded-[3rem] p-10 shadow-2xl shadow-indigo-500/5 border border-white">
-                        <div className="flex items-center gap-4 mb-8">
-                            <div className="w-2.5 h-10 bg-emerald-400 rounded-full"></div>
-                            <div>
-                                <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Ticket Dispatch Report</h3>
-                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">Employees who received tickets</p>
-                            </div>
-                            <span className="ml-auto bg-emerald-50 text-emerald-600 border border-emerald-100 text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-widest">
-                                {bookedRequests.length} Sent
-                            </span>
-                        </div>
-                        {bookedRequests.length === 0 ? (
-                            <div className="text-center py-16 border-2 border-dashed border-slate-100 rounded-[2rem]">
-                                <p className="text-slate-400 font-bold text-sm italic">No tickets dispatched yet.</p>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 border-b border-slate-100">
-                                            <th className="pb-4 pr-6">Employee</th>
-                                            <th className="pb-4 pr-6">Route</th>
-                                            <th className="pb-4 pr-6">Mode</th>
-                                            <th className="pb-4 pr-6">Departure</th>
-                                            <th className="pb-4 pr-6">Ticket</th>
-                                            <th className="pb-4 text-right">Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {bookedRequests.map(req => (
-                                            <tr key={req.id} className="hover:bg-slate-50/60 transition-all group">
-                                                <td className="py-5 pr-6">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center font-black text-indigo-600 text-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                                                            {req.employee?.name?.[0]}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-black text-slate-900 text-sm leading-none">{req.employee?.name}</p>
-                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID: #{req.employee?.id}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="py-5 pr-6">
-                                                    <p className="text-sm font-black text-slate-700">{req.fromLocation} <span className="text-indigo-400">→</span> {req.toLocation}</p>
-                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{req.tripType === 'round-trip' ? 'Round Trip' : 'One Way'}</p>
-                                                </td>
-                                                <td className="py-5 pr-6">
-                                                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 uppercase tracking-widest">{req.travelMode}</span>
-                                                </td>
-                                                <td className="py-5 pr-6">
-                                                    <p className="text-xs font-black text-slate-700">{new Date(req.departureDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                                                    {req.tripType === 'round-trip' && req.returnDate && (
-                                                        <p className="text-[10px] font-black text-emerald-500 mt-0.5">{new Date(req.returnDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                                                    )}
-                                                </td>
-                                                <td className="py-5 pr-6">
-                                                    <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border ${
-                                                        req.ticketPath
-                                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                                            : 'bg-slate-50 text-slate-400 border-slate-100'
-                                                    }`}>
-                                                        {req.ticketPath ? '✓ Uploaded' : 'Generated'}
-                                                    </span>
-                                                </td>
-                                                <td className="py-5 text-right">
-                                                    <p className="text-lg font-black text-slate-900">₹{req.cost?.toLocaleString('en-IN')}</p>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot className="border-t-2 border-slate-100">
-                                        <tr>
-                                            <td colSpan="5" className="pt-4 font-black text-slate-500 uppercase text-xs tracking-widest">Total Dispatched</td>
-                                            <td className="pt-4 text-right text-xl font-black text-slate-900">
-                                                ₹{bookedRequests.reduce((s, r) => s + (r.cost || 0), 0).toLocaleString('en-IN')}
-                                            </td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        )}
-                    </div>
+                    <motion.p
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.2 }}
+                        className="text-sm sm:text-base text-white/90 font-medium leading-relaxed max-w-xl"
+                    >
+                        Purchase corporate flights, finalize reservations and issue verified e-tickets to employees.
+                    </motion.p>
                 </div>
 
-                {/* Right Panel - Insights / Fulfillment / User Management */}
-                <div className="lg:col-span-1 sticky top-28 space-y-10">
-                    {/* Insights */}
-                    <div className="bg-white rounded-[3rem] p-10 shadow-[0_50px_100px_-20px_rgba(99,102,241,0.15)] border border-white">
-                        <h2 className="text-3xl font-black text-slate-900 mb-8 flex items-center gap-4 tracking-tighter">
-                            <div className="w-2.5 h-10 bg-[#6366f1] rounded-full"></div>
-                            Insights
-                        </h2>
-                        <div className="grid grid-cols-1 gap-5">
-                            <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                                <div className="flex items-start justify-between gap-4 mb-3">
-                                    <div>
-                                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">This Month</p>
-                                        <p className="text-3xl font-black text-slate-900 mt-2">₹{(insights?.monthlyCost || 0).toFixed(2)}</p>
-                                        <p className="text-xs font-black text-slate-500 mt-1">{insights?.monthlyTrips || 0} trip{(insights?.monthlyTrips || 0) === 1 ? '' : 's'}</p>
-                                    </div>
-                                    <div className="rounded-full bg-indigo-100 p-3">
-                                        <BarChart2 className="h-6 w-6 text-indigo-600" />
-                                    </div>
-                                </div>
+                {/* ── 2. STATS ROW (4 COMPACT WHITE CARDS) ─────────────────── */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
+                    {/* Card 1: Awaiting Booking */}
+                    <motion.div
+                        whileHover={{ y: -3, scale: 1.015 }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                        onClick={() => { setActiveTab('QUEUE'); setSelectedReq(null); }}
+                        className={`p-4 sm:p-4.5 rounded-2xl cursor-pointer transition-all duration-300 relative overflow-hidden bg-white border border-white/80 shadow-[0_12px_30px_-10px_rgba(20,10,60,0.1)] group select-none ${
+                            activeTab === 'QUEUE'
+                                ? 'border-amber-400 ring-2 ring-amber-100/70 shadow-amber-500/15'
+                                : 'hover:border-amber-100 hover:shadow-lg'
+                        }`}
+                    >
+                        <div className="flex items-center justify-between relative z-10">
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-400 text-white flex items-center justify-center shadow-md shadow-amber-500/25 group-hover:scale-105 transition-transform">
+                                <Clock className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-100/80 flex items-center gap-1 shadow-2xs">
+                                <span className={`w-1.5 h-1.5 rounded-full bg-amber-500 ${approvedRequests.length > 0 ? 'animate-ping' : ''}`} />
+                                Queue
+                            </span>
+                        </div>
+                        <div className="mt-2.5 relative z-10">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                                Awaiting Booking
+                            </span>
+                            <div className="flex items-baseline gap-1.5 mt-0.5">
+                                <p className="text-2xl font-black tracking-tight text-slate-900">
+                                    {approvedRequests.length}
+                                </p>
+                                <span className="text-[11px] font-bold text-amber-600">
+                                    {approvedRequests.length > 0 ? 'Action needed' : 'Clear'}
+                                </span>
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-medium block truncate">
+                                Ready for ticket issue
+                            </span>
+                        </div>
+                    </motion.div>
 
+                    {/* Card 2: Dispatched Tickets */}
+                    <motion.div
+                        whileHover={{ y: -3, scale: 1.015 }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                        onClick={() => { setActiveTab('DISPATCHED'); setSelectedReq(null); }}
+                        className={`p-4 sm:p-4.5 rounded-2xl cursor-pointer transition-all duration-300 relative overflow-hidden bg-white border border-white/80 shadow-[0_12px_30px_-10px_rgba(20,10,60,0.1)] group select-none ${
+                            activeTab === 'DISPATCHED'
+                                ? 'border-emerald-500 ring-2 ring-emerald-100/70 shadow-emerald-500/15'
+                                : 'hover:border-emerald-100 hover:shadow-lg'
+                        }`}
+                    >
+                        <div className="flex items-center justify-between relative z-10">
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center shadow-md shadow-emerald-500/25 group-hover:scale-105 transition-transform">
+                                <Ticket className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100/80 flex items-center gap-1 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                Dispatched
+                            </span>
+                        </div>
+                        <div className="mt-2.5 relative z-10">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                                Dispatched Tickets
+                            </span>
+                            <div className="flex items-baseline gap-1.5 mt-0.5">
+                                <p className="text-2xl font-black tracking-tight text-slate-900">
+                                    {bookedRequests.length}
+                                </p>
+                                <span className="text-[11px] font-bold text-emerald-600">
+                                    {bookedRequests.length > 0 ? 'Verified' : 'None'}
+                                </span>
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-medium block truncate">
+                                Tickets issued
+                            </span>
+                        </div>
+                    </motion.div>
 
+                    {/* Card 3: This Month Spend */}
+                    <motion.div
+                        whileHover={{ y: -3, scale: 1.015 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                        className="p-4 sm:p-4.5 rounded-2xl transition-all duration-300 relative overflow-hidden bg-white border border-white/80 shadow-[0_12px_30px_-10px_rgba(20,10,60,0.1)] group select-none hover:shadow-lg"
+                    >
+                        <div className="flex items-center justify-between relative z-10">
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-[#6541e9] to-[#818cf8] text-white flex items-center justify-center shadow-md shadow-indigo-500/25 group-hover:scale-105 transition-transform">
+                                <IndianRupee className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-[#6541e9] border border-indigo-100/80 flex items-center gap-1 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#6541e9]" />
+                                Spend
+                            </span>
+                        </div>
+                        <div className="mt-2.5 relative z-10">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                                This Month Spend
+                            </span>
+                            <div className="flex items-baseline gap-1 mt-0.5">
+                                <p className="text-2xl font-black tracking-tight truncate text-slate-900">
+                                    ₹{(insights?.monthlyCost || 0).toLocaleString('en-IN')}
+                                </p>
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-medium mt-0.5 block truncate">
+                                {insights?.monthlyTrips || 0} trips this month
+                            </span>
+                        </div>
+                    </motion.div>
 
-                                <div className="border-t border-slate-200 pt-4">
-                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">This Year (All Time)</p>
-                                    <p className="text-xl font-black text-slate-900 mt-2">₹{allBookedRequests.reduce((sum, r) => sum + (Number(r.cost) || 0), 0).toFixed(2)}</p>
-                                    <p className="text-xs font-black text-slate-500 mt-1">{allBookedRequests.length} trip{allBookedRequests.length === 1 ? '' : 's'}</p>
-                                </div>
+                    {/* Card 4: Team Roster / User Management */}
+                    <motion.div
+                        whileHover={{ y: -3, scale: 1.015 }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                        onClick={() => navigate('/admin/users')}
+                        className="p-4 sm:p-4.5 rounded-2xl text-white shadow-lg shadow-rose-950/20 cursor-pointer transition-all duration-300 relative overflow-hidden flex flex-col justify-between group border border-white/20 select-none"
+                        style={{
+                            background: 'linear-gradient(135deg, #d91456 0%, #cb0f41 45%, #8c1d7e 100%)',
+                        }}
+                    >
+                        <div className="flex items-center justify-between relative z-10">
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center border border-white/20 shadow-md group-hover:scale-105 transition-transform">
+                                <Users className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-white/20 border border-white/30 text-white backdrop-blur-md shadow-2xs flex items-center gap-1">
+                                <Sparkles className="w-2.5 h-2.5 text-amber-300" />
+                                <span>Roster</span>
+                            </span>
+                        </div>
+                        <div className="mt-2.5 relative z-10">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-white/80 block">
+                                TEAM ROSTER
+                            </span>
+                            <p className="text-xl sm:text-2xl font-black text-white mt-0.5 leading-tight tracking-tight">
+                                User Management
+                            </p>
+                            <div className="mt-1 flex items-center gap-1 text-[11px] font-bold text-white/95 group-hover:underline">
+                                <span>Manage roles →</span>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+
+                {/* ── 3. FLOATING WHITE WORKSPACE CARD ───────────────────── */}
+                <div id="admin-workspace-card" className="bg-white backdrop-blur-2xl rounded-[2.8rem] p-7 sm:p-10 border border-white/80 shadow-[0_25px_70px_-15px_rgba(20,10,60,0.3)] space-y-8 relative overflow-hidden">
+                    {/* Filter & Command Strip */}
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-2 border-b border-slate-100">
+                        {/* Tabs */}
+                        <div className="flex items-center gap-1.5 p-1.5 bg-slate-100/90 rounded-2xl w-full md:w-auto overflow-x-auto scrollbar-none">
+                            <button
+                                onClick={() => { setActiveTab('QUEUE'); setSelectedReq(null); }}
+                                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                                    activeTab === 'QUEUE'
+                                        ? 'bg-white text-slate-900 shadow-sm font-extrabold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <span>Booking Queue</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                    activeTab === 'QUEUE' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-700'
+                                }`}>
+                                    {approvedRequests.length}
+                                </span>
+                            </button>
+
+                            <button
+                                onClick={() => { setActiveTab('DISPATCHED'); setSelectedReq(null); }}
+                                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                                    activeTab === 'DISPATCHED'
+                                        ? 'bg-white text-slate-900 shadow-sm font-extrabold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <span>Dispatched Tickets</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                    activeTab === 'DISPATCHED' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                                }`}>
+                                    {bookedRequests.length}
+                                </span>
+                            </button>
+
+                            <button
+                                onClick={() => { setActiveTab('ALL'); setSelectedReq(null); }}
+                                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                                    activeTab === 'ALL'
+                                        ? 'bg-white text-slate-900 shadow-sm font-extrabold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <span>All Requests</span>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-200 text-slate-700">
+                                    {requests.length}
+                                </span>
+                            </button>
+                        </div>
+
+                        {/* Search & Mode Filters */}
+                        <div className="flex items-center gap-2.5 w-full md:w-auto">
+                            <div className="relative flex-1 md:w-64">
+                                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                                <input
+                                    type="text"
+                                    placeholder="Filter employee, city, ref..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#6541e9] focus:ring-2 focus:ring-[#6541e9]/15 outline-none transition-all"
+                                />
+                                {searchTerm && (
+                                    <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
                             </div>
 
-                            {insights.topTraveler ? (
-                                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Top Traveler</p>
-                                    <p className="text-lg font-black text-slate-900">{insights.topTraveler?.name || 'Unknown'}</p>
-                                    <p className="text-xs font-black text-slate-500 mt-1">
-                                        {insights.topTraveler?.trips || 0} trip{(insights.topTraveler?.trips || 0) === 1 ? '' : 's'} • Last: {insights.topTraveler?.lastTravel ? new Date(insights.topTraveler.lastTravel).toLocaleDateString() : 'N/A'}
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 text-center">
-                                    <p className="text-sm font-black text-slate-500">No bookings yet to build insights.</p>
-                                </div>
-                            )}
+                            <select
+                                value={modeFilter}
+                                onChange={(e) => setModeFilter(e.target.value)}
+                                className="px-3 py-2.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-[#6541e9] cursor-pointer"
+                            >
+                                <option value="ALL">All Modes</option>
+                                <option value="Flight">Flights</option>
+                                <option value="Train">Trains</option>
+                                <option value="Cab">Cabs</option>
+                            </select>
+
+                            <button
+                                onClick={fetchRequests}
+                                title="Sync requests"
+                                className="p-2.5 rounded-xl border border-slate-200/90 text-slate-500 hover:text-[#6541e9] hover:bg-slate-50 transition-all cursor-pointer"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                            </button>
                         </div>
                     </div>
 
-
-                    {/* Fulfillment */}
-                    <div className="bg-white rounded-[3rem] p-12 shadow-[0_50px_100px_-20px_rgba(99,102,241,0.15)] border-4 border-white overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50/50 blur-[100px] rounded-full translate-x-1/2 -translate-y-1/2"></div>
-                        <h2 className="text-3xl font-black text-slate-900 mb-10 flex items-center gap-4 tracking-tighter">
-                            <div className="w-2.5 h-10 bg-[#6366f1] rounded-full"></div>
-                            Fulfillment
-                        </h2>
-
-                        <AnimatePresence mode='wait'>
-                            {selectedReq ? (
-                                <motion.form
-                                    key="form"
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -20 }}
-                                    onSubmit={handleBookTicket}
-                                    className="space-y-8"
+                    {/* ── MAIN WORKSPACE: DEDICATED FULFILLMENT PAGE vs FULL-WIDTH INVENTORY CONSOLE ── */}
+                    <AnimatePresence mode="wait">
+                {selectedReq ? (
+                    /* ══════════════════════════════════════════════════════════ */
+                    /* ── VIEW 1: DEDICATED FULFILLMENT & E-TICKET ISSUANCE PAGE ─ */
+                    /* ══════════════════════════════════════════════════════════ */
+                    <motion.div
+                        key={`fulfill-${selectedReq.id}`}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="space-y-6"
+                    >
+                        {/* Navigation Bar / Breadcrumb Strip */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/90">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={handleBackToList}
+                                    className="px-4 py-2 rounded-2xl bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-[#163c8c] transition-all group flex items-center gap-2 font-bold text-xs"
                                 >
-                                    <div className="bg-indigo-50/50 p-8 rounded-[2rem] border border-indigo-100 group-hover:bg-indigo-50 transition-all">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-4">Target Account</p>
-                                        <div className="flex justify-between items-center mb-4">
-                                            <p className="font-black text-slate-900 text-2xl tracking-tighter">{selectedReq.employee?.name}</p>
-                                            <div className="flex gap-2">
-                                                <span className="bg-slate-200 text-slate-600 text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest">
-                                                    {selectedReq.tripType === 'round-trip' ? 'Round Trip' : 'One Way'}
-                                                </span>
-                                                <span className="bg-indigo-600 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">{selectedReq.travelMode}</span>
+                                    <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+                                    <span>Back to {activeTab === 'DISPATCHED' ? 'Dispatched Tickets' : 'Booking Queue'}</span>
+                                </button>
+                                <div className="h-5 w-[1px] bg-slate-200 hidden sm:block" />
+                                <div className="hidden sm:block">
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Navigation</p>
+                                    <p className="text-xs font-extrabold text-slate-700">
+                                        Admin Console / {activeTab === 'DISPATCHED' ? 'Dispatched Tickets' : 'Booking Queue'} / <span className="text-[#163c8c]">Ref #{selectedReq.id}</span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border shadow-xs ${
+                                    selectedReq.status === 'BOOKED'
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                        : 'bg-blue-50 text-blue-800 border-blue-200'
+                                }`}>
+                                    {selectedReq.status === 'BOOKED' ? '✓ E-Ticket Dispatched' : '⚡ Pending E-Ticket Fulfillment'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Dedicated Fulfillment 2-Column Spacious Workspace */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                            {/* ── LEFT COLUMN: TRAVELER DOSSIER & ROUTE SUMMARY (7 Cols) ── */}
+                            <div className="lg:col-span-7 space-y-5">
+                                {/* Passenger Profile Card */}
+                                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/90 space-y-4">
+                                    <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                                        <div className="flex items-center gap-3.5">
+                                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#163c8c] to-blue-500 text-white font-black text-xl flex items-center justify-center shadow-md shadow-blue-900/20 shrink-0">
+                                                {(selectedReq.employee?.name || selectedReq.employee?.email || 'EP')
+                                                    .split(' ')
+                                                    .map(n => n[0])
+                                                    .join('')
+                                                    .toUpperCase()
+                                                    .slice(0, 2)}
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="text-lg font-black text-slate-900 leading-tight">
+                                                        {selectedReq.employee?.name || 'Corporate Traveler'}
+                                                    </h3>
+                                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                                                        Ref: #{selectedReq.id}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                                    {selectedReq.employee?.email}
+                                                </p>
                                             </div>
                                         </div>
-                                        <div className="space-y-4">
-                                            {/* Departure Leg */}
-                                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <div className="h-1.5 w-1.5 rounded-full bg-indigo-600"></div>
-                                                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Departure Leg</span>
-                                                </div>
-                                                <div className="flex items-center gap-3 text-[12px] font-black text-slate-800 mb-3">
-                                                    <MapPin className="w-4 h-4 text-indigo-500" />
-                                                    {selectedReq.fromLocation} <ArrowRight className="w-3 h-3 text-indigo-400" /> {selectedReq.toLocation}
-                                                </div>
-                                                <div className="flex flex-wrap gap-4">
-                                                    <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
-                                                        <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                                                        {new Date(selectedReq.departureDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                    </div>
-                                                    {selectedReq.preferredTime && (
-                                                        <div className="flex items-center gap-2 text-[11px] font-bold text-indigo-600">
-                                                            <Clock className="w-3.5 h-3.5" />
-                                                            {selectedReq.preferredTime}
-                                                        </div>
-                                                    )}
-                                                </div>
+
+                                        <span className="px-3 py-1 rounded-xl bg-indigo-50 text-[#163c8c] font-black text-[11px] uppercase tracking-wider border border-indigo-100">
+                                            {selectedReq.travelMode || 'Flight'}
+                                        </span>
+                                    </div>
+
+                                    {/* Route Visualization */}
+                                    <div className="bg-gradient-to-r from-slate-50 via-blue-50/30 to-slate-50 rounded-2xl p-5 border border-slate-100">
+                                        <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-200/60 mb-4">
+                                            <span className="font-extrabold text-slate-400 uppercase tracking-wider text-[10px]">
+                                                {selectedReq.travelMode || 'Flight'} Route & Timings
+                                            </span>
+                                            <span className="font-black text-blue-700 bg-blue-100/70 px-2.5 py-0.5 rounded-lg text-[10px] uppercase">
+                                                {selectedReq.tripType === 'round-trip' ? 'Round Trip' : 'One Way'}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-3">
+                                            {/* Origin */}
+                                            <div className="text-left flex-1 min-w-0">
+                                                <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider">
+                                                    {selectedReq.travelMode === 'Train' ? 'Boarding Station' : selectedReq.travelMode === 'Bus' ? 'Boarding Point / City' : 'Departure Airport / City'}
+                                                </p>
+                                                <p className="font-black text-slate-900 text-base sm:text-lg mt-0.5 truncate">{selectedReq.fromLocation}</p>
+                                                <p className="text-xs font-bold text-slate-600 mt-1 flex items-center gap-1.5">
+                                                    <Calendar className="w-3.5 h-3.5 text-[#163c8c]" />
+                                                    <span>{new Date(selectedReq.departureDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                                </p>
+                                                {selectedReq.preferredTime && (
+                                                    <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                                                        <Clock className="w-3 h-3" />
+                                                        <span>{selectedReq.preferredTime}</span>
+                                                    </p>
+                                                )}
                                             </div>
 
-                                            {/* Return Leg (Round Trip) */}
-                                            {selectedReq.tripType === 'round-trip' && (
-                                                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100/50">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-600"></div>
-                                                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Return Leg</span>
+                                            {/* Center Transit Contrail */}
+                                            <div className="flex flex-col items-center px-2 shrink-0">
+                                                <div className="flex items-center gap-1 text-[#163c8c]">
+                                                    <div className="w-6 sm:w-10 h-[2px] bg-gradient-to-r from-blue-200 to-blue-400" />
+                                                    <div className="p-2 rounded-full bg-white shadow-xs border border-blue-100">
+                                                        {selectedReq.travelMode === 'Train' ? (
+                                                            <Train className="w-4 h-4 text-[#163c8c]" />
+                                                        ) : selectedReq.travelMode === 'Bus' ? (
+                                                            <Bus className="w-4 h-4 text-[#163c8c]" />
+                                                        ) : (
+                                                            <Plane className="w-4 h-4 transform rotate-45 text-[#163c8c]" />
+                                                        )}
                                                     </div>
-                                                    <div className="flex items-center gap-3 text-[12px] font-black text-slate-800 mb-3">
-                                                        <MapPin className="w-4 h-4 text-emerald-500" />
-                                                        {selectedReq.toLocation} <ArrowRight className="w-3 h-3 text-emerald-400" /> {selectedReq.fromLocation}
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-4">
-                                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
-                                                            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-                                                            {selectedReq.returnDate ? new Date(selectedReq.returnDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Date Pending'}
-                                                        </div>
+                                                    <div className="w-6 sm:w-10 h-[2px] bg-gradient-to-r from-blue-400 to-blue-200" />
+                                                </div>
+                                                <span className="text-[9px] font-black text-slate-500 uppercase mt-1 tracking-wider">
+                                                    {selectedReq.tripType === 'round-trip' ? 'Round Trip' : 'One Way'}
+                                                </span>
+                                            </div>
+
+                                            {/* Destination */}
+                                            <div className="text-right flex-1 min-w-0">
+                                                <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Arrival Destination</p>
+                                                <p className="font-black text-[#163c8c] text-base sm:text-lg mt-0.5 truncate">{selectedReq.toLocation}</p>
+                                                {selectedReq.tripType === 'round-trip' && selectedReq.returnDate && (
+                                                    <>
+                                                        <p className="text-xs font-bold text-emerald-700 mt-1 flex items-center justify-end gap-1.5">
+                                                            <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                                                            <span>{new Date(selectedReq.returnDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                                        </p>
                                                         {selectedReq.preferredReturnTime && (
-                                                            <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-600">
-                                                                <Clock className="w-3.5 h-3.5" />
-                                                                {selectedReq.preferredReturnTime}
+                                                            <p className="text-[11px] text-slate-400 mt-0.5 flex items-center justify-end gap-1">
+                                                                <Clock className="w-3 h-3" />
+                                                                <span>{selectedReq.preferredReturnTime}</span>
+                                                            </p>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Purpose & Approvals */}
+                                    {selectedReq.reasonForTravel && (
+                                        <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 space-y-1">
+                                            <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Purpose of Travel</p>
+                                            <p className="text-xs text-slate-700 font-medium italic">
+                                                "{selectedReq.reasonForTravel}"
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Manager Review Notes if any */}
+                                    {selectedReq.managerComments && (
+                                        <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-100/80 space-y-1">
+                                            <p className="text-[10px] text-amber-800 uppercase font-black tracking-wider">Manager Review Notes</p>
+                                            <p className="text-xs text-amber-900 font-medium">
+                                                "{selectedReq.managerComments}"
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Existing Dispatched Passes if BOOKED */}
+                                    {selectedReq.status === 'BOOKED' && (selectedReq.departureTicketPath || selectedReq.returnTicketPath) && (
+                                        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-3">
+                                            <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                                                <Ticket className="w-4 h-4 text-emerald-600" />
+                                                <span>Active Dispatched Passes:</span>
+                                            </span>
+                                            {selectedReq.departureTicketPath && (
+                                                <a
+                                                    href={`/api/requests/${selectedReq.id}/departure-ticket`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="px-3.5 py-1.5 rounded-xl bg-blue-50 text-[#163c8c] hover:bg-blue-100 text-xs font-bold transition-all flex items-center gap-1.5 border border-blue-100 shadow-xs"
+                                                >
+                                                    <span>Departure E-Ticket</span>
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                </a>
+                                            )}
+                                            {selectedReq.returnTicketPath && (
+                                                <a
+                                                    href={`/api/requests/${selectedReq.id}/return-ticket`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="px-3.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold transition-all flex items-center gap-1.5 border border-emerald-100 shadow-xs"
+                                                >
+                                                    <span>Return E-Ticket</span>
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ── RIGHT COLUMN: FULFILLMENT & COST DISPATCH FORM (5 Cols) ─ */}
+                            <div className="lg:col-span-5 sticky top-24 space-y-6">
+                                <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-200/90 relative overflow-hidden">
+                                    <div className="flex items-center gap-2.5 pb-4 mb-5 border-b border-slate-100">
+                                        <div className="w-2.5 h-6 bg-gradient-to-b from-[#163c8c] to-blue-500 rounded-full" />
+                                        <div>
+                                            <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                                                Fulfillment & E-Ticket Desk
+                                            </h3>
+                                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                                Issue Digital Pass & Record Tariff
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* ── Step 1: Mode-Aware Booking Gateway (MakeMyTrip / redBus / IRCTC) ── */}
+                                    {(() => {
+                                        const portal = getBookingPortalConfig(selectedReq);
+                                        const PortalIcon = portal.icon;
+                                        return (
+                                            <div className={`mb-5 p-4 rounded-2xl bg-gradient-to-br ${portal.cardBg} shadow-xs`}>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-8 h-7 px-1.5 rounded-lg bg-gradient-to-tr ${portal.gradient} text-white flex items-center justify-center font-black text-[10px] tracking-tight shadow-xs`}>
+                                                            {portal.tag}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-xs font-black text-slate-900 leading-tight">
+                                                                {portal.title}
+                                                            </h4>
+                                                            <p className="text-[10px] text-slate-400 font-medium">
+                                                                {portal.subtitle}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <span className={`px-2 py-0.5 rounded-full ${portal.badgeBg} text-[9px] font-black uppercase tracking-wider`}>
+                                                        Step 1 of 2
+                                                    </span>
+                                                </div>
+
+                                                <p className="text-[11px] text-slate-600 mb-3 leading-relaxed">
+                                                    {portal.description}
+                                                </p>
+
+                                                <a
+                                                    href={portal.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className={`w-full py-3 px-4 rounded-xl bg-gradient-to-r ${portal.gradient} hover:opacity-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-95 select-none`}
+                                                >
+                                                    <div className="w-5 h-5 rounded-md bg-white/25 flex items-center justify-center">
+                                                        <PortalIcon className="w-3.5 h-3.5 text-white" />
+                                                    </div>
+                                                    <span>{portal.buttonText}</span>
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                </a>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    <form onSubmit={handleBookTicket} className="space-y-5">
+                                        <div className="flex items-center justify-between pt-1 pb-1 border-b border-slate-100">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                                Step 2: Tariff & Ticket Upload
+                                            </span>
+                                            <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                                                <span>✓ {getBookingPortalConfig(selectedReq).uploadLabel}</span>
+                                            </span>
+                                        </div>
+
+                                        {/* Cost Input */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-extrabold text-slate-700 block">
+                                                Final Ticket Cost (₹) <span className="text-rose-500">*</span>
+                                            </label>
+                                            <div className="relative">
+                                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    required
+                                                    value={bookingData.cost}
+                                                    onChange={(e) => setBookingData({ ...bookingData, cost: e.target.value })}
+                                                    placeholder="e.g. 70000"
+                                                    className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-bold text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Ticket Uploads */}
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-xs font-extrabold text-slate-700 block mb-1">
+                                                    Upload Departure Ticket <span className="text-slate-400 font-normal">(PDF or Image)</span>
+                                                </label>
+                                                <input
+                                                    type="file"
+                                                    accept=".pdf,image/*"
+                                                    onChange={(e) => setTicketFile(e.target.files?.[0] || null)}
+                                                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-[#163c8c] hover:file:bg-blue-100 cursor-pointer border border-slate-200/80 rounded-xl p-1 bg-slate-50"
+                                                />
+                                                {selectedReq?.departureTicketPath && (
+                                                    <p className="text-[11px] text-emerald-600 font-bold mt-1.5 flex items-center gap-1">
+                                                        <span>✓ Departure ticket currently on file</span>
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {selectedReq.tripType === 'round-trip' && (
+                                                <div>
+                                                    <label className="text-xs font-extrabold text-slate-700 block mb-1">
+                                                        Upload Return Ticket <span className="text-slate-400 font-normal">(PDF or Image)</span>
+                                                    </label>
+                                                    <input
+                                                        type="file"
+                                                        accept=".pdf,image/*"
+                                                        onChange={(e) => setReturnTicketFile(e.target.files?.[0] || null)}
+                                                        className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border border-slate-200/80 rounded-xl p-1 bg-slate-50"
+                                                    />
+                                                    {selectedReq?.returnTicketPath && (
+                                                        <p className="text-[11px] text-emerald-600 font-bold mt-1.5 flex items-center gap-1">
+                                                            <span>✓ Return ticket currently on file</span>
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Policy Info Box */}
+                                        <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100 flex items-start gap-2.5 text-xs text-slate-600">
+                                            <ShieldCheck className="w-4 h-4 text-[#163c8c] shrink-0 mt-0.5" />
+                                            <span>Issued passes are instantly synced to the employee's dashboard and emailed directly.</span>
+                                        </div>
+
+                                        {/* Action Buttons */}
+                                        <div className="grid grid-cols-2 gap-3 pt-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleBackToList}
+                                                className="py-3 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition-all text-center"
+                                            >
+                                                Cancel
+                                            </button>
+
+                                            <button
+                                                type="submit"
+                                                disabled={isBooking}
+                                                className="py-3 px-4 rounded-xl bg-gradient-to-r from-[#163c8c] via-blue-700 to-[#163c8c] hover:from-[#0f2d6b] hover:to-blue-800 text-white text-xs font-bold shadow-md shadow-blue-900/20 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95"
+                                            >
+                                                <Ticket className="w-4 h-4 text-white" />
+                                                <span>{isBooking ? 'Dispatching...' : 'Issue E-Ticket'}</span>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                ) : (
+                    /* ══════════════════════════════════════════════════════════ */
+                    /* ── VIEW 2: FULL-WIDTH INVENTORY CONSOLE WITH PAGINATION ─ */
+                    /* ══════════════════════════════════════════════════════════ */
+                    <motion.div
+                        key="list-page"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="space-y-6"
+                    >
+                        {/* Requisitions Header Strip */}
+                        <div id="inventory-queue-section" className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-2 scroll-mt-24">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="w-2 h-2 rounded-full bg-[#163c8c] animate-pulse" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-[#163c8c]">
+                                        Live Inventory Queue
+                                    </span>
+                                </div>
+                                <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+                                    <span>{activeTab === 'QUEUE' ? 'Fulfillment Queue' : activeTab === 'DISPATCHED' ? 'Dispatched E-Tickets' : 'All Travel Records'}</span>
+                                    <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#163c8c] text-xs font-black border border-blue-100">
+                                        {displayedRequests.length} {displayedRequests.length === 1 ? 'Record' : 'Records'}
+                                    </span>
+                                </h2>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={fetchRequests}
+                                    title="Sync feed"
+                                    className="p-2 rounded-xl bg-white border border-slate-200/80 text-slate-500 hover:text-[#163c8c] hover:bg-slate-50 transition-all shadow-xs"
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                                </button>
+                                <button
+                                    onClick={() => navigate('/reports')}
+                                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition-colors flex items-center gap-1.5"
+                                >
+                                    <span>Financial Reports</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {loading ? (
+                            <div className="space-y-4">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="h-36 bg-white rounded-3xl border border-slate-200/80 animate-pulse p-6" />
+                                ))}
+                            </div>
+                        ) : (
+                            <AnimatePresence mode="wait">
+                                {displayedRequests.length === 0 ? (
+                                    /* Empty State Matching User Mockup */
+                                    <motion.div
+                                        key={`empty-${activeTab}`}
+                                        initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -15, scale: 0.98 }}
+                                        transition={{ duration: 0.35, ease: 'easeOut' }}
+                                        className="p-8 sm:p-14 text-center relative overflow-hidden"
+                                    >
+                                        <div className="w-14 h-14 rounded-2xl bg-[#f2ebff] text-[#7c3aed] flex items-center justify-center mx-auto mb-5 shadow-sm">
+                                            <Plane className="w-6 h-6 transform rotate-45 text-[#7c3aed]" />
+                                        </div>
+
+                                        <h3 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mb-2">
+                                            {activeTab === 'QUEUE' ? 'All Clear — Booking Queue Empty!' : 'No Records Found'}
+                                        </h3>
+                                        <p className="text-sm text-slate-500 max-w-lg mx-auto mb-8 leading-relaxed font-medium">
+                                            {activeTab === 'QUEUE' 
+                                                ? 'Zero manager-approved trips are waiting for booking. All employee flight requests have been issued corporate e-tickets.'
+                                                : 'There are no travel records matching your current filter criteria.'}
+                                        </p>
+
+                                        <div className="flex flex-wrap items-center justify-center gap-3.5">
+                                            {activeTab === 'QUEUE' && bookedRequests.length > 0 && (
+                                                <motion.button
+                                                    whileHover={{ scale: 1.04, y: -2 }}
+                                                    whileTap={{ scale: 0.94 }}
+                                                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                                                    onClick={() => {
+                                                        setActiveTab('DISPATCHED');
+                                                        setSelectedReq(null);
+                                                        const el = document.getElementById('inventory-queue-section');
+                                                        if (el) {
+                                                            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                        }
+                                                    }}
+                                                    className="px-6 py-3.5 rounded-2xl text-white font-bold text-xs shadow-lg shadow-rose-900/25 hover:shadow-rose-900/40 transition-all select-none flex items-center gap-2 cursor-pointer active:shadow-md"
+                                                    style={{
+                                                        background: 'linear-gradient(135deg, #d91456 0%, #cb0f41 50%, #8c1d7e 100%)',
+                                                    }}
+                                                >
+                                                    <Ticket className="w-4 h-4" />
+                                                    <span>View {bookedRequests.length} Dispatched Tickets</span>
+                                                </motion.button>
+                                            )}
+                                            <motion.button
+                                                whileHover={{ scale: 1.03, y: -2 }}
+                                                whileTap={{ scale: 0.96 }}
+                                                onClick={() => navigate('/admin/users')}
+                                                className="px-6 py-3.5 rounded-2xl bg-[#f0edff] hover:bg-[#e4ddff] text-[#6541e9] font-bold text-xs transition-all select-none flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <Users className="w-4 h-4 text-[#6541e9]" />
+                                                <span>Team User Roster</span>
+                                            </motion.button>
+                                            <motion.button
+                                                whileHover={{ scale: 1.03, y: -2 }}
+                                                whileTap={{ scale: 0.96 }}
+                                                onClick={() => navigate('/reports')}
+                                                className="px-6 py-3.5 rounded-2xl bg-[#f0edff] hover:bg-[#e4ddff] text-[#6541e9] font-bold text-xs transition-all select-none flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <BarChart2 className="w-4 h-4 text-[#6541e9]" />
+                                                <span>Reports & Spend</span>
+                                            </motion.button>
+                                        </div>
+                                    </motion.div>
+                                ) : (
+                                    /* Full-Width Luxury Boarding Pass Cards */
+                                    <motion.div
+                                        key={`list-${activeTab}`}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="space-y-4"
+                                    >
+                                        <AnimatePresence mode="popLayout">
+                                            {paginatedRequests.map((req, idx) => {
+                                        const isApproved = req.status === 'APPROVED';
+                                        const isBooked = req.status === 'BOOKED';
+
+                                        const employeeInitials = (req.employee?.name || req.employee?.email || 'EP')
+                                            .split(' ')
+                                            .map(n => n[0])
+                                            .join('')
+                                            .toUpperCase()
+                                            .slice(0, 2);
+
+                                        return (
+                                            <motion.div
+                                                key={req.id}
+                                                layout
+                                                initial={{ opacity: 0, y: 15 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, scale: 0.95 }}
+                                                whileHover={{ y: -3 }}
+                                                transition={{ duration: 0.25 }}
+                                                onClick={() => handleSelectTicket(req)}
+                                                className="group relative rounded-3xl bg-white p-5 sm:p-6 transition-all duration-300 cursor-pointer border border-slate-200/80 hover:border-[#6541e9]/50 hover:shadow-[0_20px_45px_-10px_rgba(101,65,233,0.18)]"
+                                            >
+                                                {/* Top Strip: Passenger, ID & Status */}
+                                                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#6541e9] via-[#852278] to-[#cb0f41] text-white font-black text-sm flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+                                                            {employeeInitials}
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <h4 className="text-sm font-extrabold text-slate-900 leading-tight">
+                                                                    {req.employee?.name || 'Corporate Employee'}
+                                                                </h4>
+                                                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                                                                    Ref: #{req.id}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-[11px] text-slate-400 font-medium mt-0.5 truncate max-w-[180px] sm:max-w-md">
+                                                                {req.employee?.email || 'employee@company.com'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2.5">
+                                                        {isBooked && req.cost && (
+                                                            <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200/80 shadow-xs">
+                                                                ₹{Number(req.cost).toLocaleString('en-IN')}
+                                                            </span>
+                                                        )}
+                                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-xs ${
+                                                            isApproved
+                                                                ? 'bg-amber-50 text-amber-800 border-amber-200/80'
+                                                                : isBooked
+                                                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
+                                                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                                                        }`}>
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${isApproved ? 'bg-amber-500 animate-ping' : 'bg-emerald-600'}`} />
+                                                            <span>{isApproved ? 'Approved (Needs Booking)' : req.status}</span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Flight Route Visualizer with Airport Codes & Contrail */}
+                                                <div className="bg-gradient-to-r from-slate-50 via-indigo-50/25 to-slate-50 rounded-2xl p-4 border border-slate-100 mb-4">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        {/* Origin */}
+                                                        <div className="text-left flex-1 min-w-0">
+                                                            <div className="flex items-center gap-1 text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                                                                <MapPin className="w-3 h-3 text-[#6541e9]" />
+                                                                <span>ORIGIN</span>
+                                                            </div>
+                                                            <p className="font-black text-slate-900 text-sm sm:text-base mt-0.5 truncate">
+                                                                {req.fromLocation}
+                                                            </p>
+                                                        </div>
+
+                                                        {/* Center Flight Contrail Line */}
+                                                        <div className="flex flex-col items-center px-2 shrink-0">
+                                                            <div className="flex items-center gap-1.5 text-[#6541e9]">
+                                                                <div className="w-8 sm:w-16 h-[2px] bg-gradient-to-r from-indigo-200 to-indigo-400" />
+                                                                <div className="p-1.5 rounded-full bg-white shadow-xs border border-indigo-100">
+                                                                    {req.travelMode === 'Train' ? (
+                                                                        <Train className="w-3.5 h-3.5 text-[#6541e9]" />
+                                                                    ) : req.travelMode === 'Bus' ? (
+                                                                        <Bus className="w-3.5 h-3.5 text-[#6541e9]" />
+                                                                    ) : (
+                                                                        <Plane className="w-3.5 h-3.5 transform rotate-45 text-[#6541e9]" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="w-8 sm:w-16 h-[2px] bg-gradient-to-r from-indigo-400 to-indigo-200" />
+                                                            </div>
+                                                            <span className="text-[9px] font-black text-[#6541e9] bg-indigo-50 px-2 py-0.5 rounded-full mt-1 uppercase tracking-wider border border-indigo-100">
+                                                                {req.tripType === 'round-trip' ? 'Round Trip' : 'One Way'}
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Destination */}
+                                                        <div className="text-right flex-1 min-w-0">
+                                                            <div className="flex items-center justify-end gap-1 text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                                                                <PlaneTakeoff className="w-3 h-3 text-[#6541e9]" />
+                                                                <span>DESTINATION</span>
+                                                            </div>
+                                                            <p className="font-black text-[#6541e9] text-sm sm:text-base mt-0.5 truncate">
+                                                                {req.toLocation}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Metadata Strip: Date, Mode, Downloads & CTA */}
+                                                <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                                                    <div className="flex flex-wrap items-center gap-3 text-slate-600">
+                                                        <div className="flex items-center gap-1.5 font-bold bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-100">
+                                                            <Calendar className="w-3.5 h-3.5 text-[#6541e9]" />
+                                                            <span>{new Date(req.departureDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                                        </div>
+                                                        {req.tripType === 'round-trip' && req.returnDate && (
+                                                            <div className="flex items-center gap-1.5 font-bold bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-100">
+                                                                <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                                                                <span>Ret: {new Date(req.returnDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                                            </div>
+                                                        )}
+                                                        <span className="px-2 py-0.5 rounded-lg bg-indigo-50 text-[#6541e9] font-black text-[10px] uppercase">
+                                                            {req.travelMode || 'Flight'}
+                                                        </span>
+
+                                                        {/* Ticket Download Links if Booked */}
+                                                        {isBooked && (req.departureTicketPath || req.returnTicketPath) && (
+                                                            <div className="flex items-center gap-2">
+                                                                {req.departureTicketPath && (
+                                                                    <a
+                                                                        href={`/api/requests/${req.id}/departure-ticket`}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        onClick={e => e.stopPropagation()}
+                                                                        className="text-[11px] font-bold text-[#6541e9] hover:underline flex items-center gap-1 bg-indigo-50/80 px-2.5 py-1 rounded-lg border border-indigo-100"
+                                                                    >
+                                                                        <span>Pass</span>
+                                                                        <ExternalLink className="w-3 h-3" />
+                                                                    </a>
+                                                                )}
+                                                                {req.returnTicketPath && (
+                                                                    <a
+                                                                        href={`/api/requests/${req.id}/return-ticket`}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        onClick={e => e.stopPropagation()}
+                                                                        className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1 bg-emerald-50/80 px-2.5 py-1 rounded-lg border border-emerald-100"
+                                                                    >
+                                                                        <span>Return Pass</span>
+                                                                        <ExternalLink className="w-3 h-3" />
+                                                                    </a>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
 
-                                    <div className="space-y-6">
-
-                                        <div className="space-y-2">
-                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-2">Invoiced Amount</label>
-                                            <div className="relative">
-                                                <IndianRupee className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-[#6366f1]" />
-                                                <input
-                                                    required
-                                                    type="number"
-                                                    placeholder="0.00"
-                                                    className="mmt-input pl-16 py-6 text-2xl font-black text-slate-900"
-                                                    value={bookingData.cost}
-                                                    onChange={(e) => setBookingData({ ...bookingData, cost: e.target.value })}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-2">
-                                                {selectedReq.tripType === 'round-trip' ? 'Departure Ticket' : 'Ticket Upload'}
-                                            </label>
-                                            <input
-                                                type="file"
-                                                accept="application/pdf,image/*"
-                                                onChange={(e) => setTicketFile(e.target.files?.[0] || null)}
-                                                className="w-full rounded-xl border border-slate-200 p-3"
-                                            />
-                                            {selectedReq?.ticketPath && (
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <a
-                                                        href={`/api/requests/${selectedReq.id}/ticket`}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="text-[10px] font-black text-indigo-600 hover:text-indigo-700"
-                                                    >
-                                                        Current Departure Ticket
-                                                    </a>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {selectedReq.tripType === 'round-trip' && (
-                                            <div className="space-y-2">
-                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-2 font-black text-emerald-600">Return Ticket</label>
-                                                <input
-                                                    type="file"
-                                                    accept="application/pdf,image/*"
-                                                    onChange={(e) => setReturnTicketFile(e.target.files?.[0] || null)}
-                                                    className="w-full rounded-xl border border-emerald-100 p-3 bg-emerald-50/10"
-                                                />
-                                                {selectedReq?.returnTicketPath && (
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <a
-                                                            href={`/api/requests/${selectedReq.id}/return-ticket`}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="text-[10px] font-black text-emerald-600 hover:text-emerald-700"
+                                                    {/* Action CTA Button */}
+                                                    <div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSelectTicket(req);
+                                                            }}
+                                                            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer ${
+                                                                isApproved
+                                                                    ? 'text-white shadow-md shadow-rose-900/20 hover:scale-105 active:scale-95'
+                                                                    : 'bg-slate-100 text-slate-700 hover:bg-[#6541e9] hover:text-white'
+                                                            }`}
+                                                            style={{
+                                                                background: isApproved ? 'linear-gradient(135deg, #cb0f41 0%, #852278 100%)' : undefined,
+                                                            }}
                                                         >
-                                                            Current Return Ticket
-                                                        </a>
+                                                            <span>{isApproved ? 'Issue E-Ticket ✈' : 'View Fulfillment'}</span>
+                                                            <ChevronRight className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Purpose Snippet */}
+                                                {req.reasonForTravel && (
+                                                    <div className="mt-3 text-[11px] text-slate-500 font-medium truncate bg-slate-50/70 px-3 py-1.5 rounded-xl border border-slate-100 flex items-center gap-1.5">
+                                                        <Briefcase className="w-3 h-3 text-slate-400 shrink-0" />
+                                                        <span className="font-bold text-slate-700">Purpose:</span>
+                                                        <span className="truncate">{req.reasonForTravel}</span>
                                                     </div>
                                                 )}
-                                            </div>
-                                        )}
-                                    </div>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </AnimatePresence>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                )}
 
-                                    <div className="pt-4">
+                        {/* ── PAGINATION CONTROLS (NAVIGATION OF PAGES) ─────────── */}
+                        {totalPages > 1 && (
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 bg-white rounded-3xl border border-slate-200/90 shadow-sm">
+                                <div className="text-xs text-slate-500 font-bold">
+                                    Showing <span className="text-slate-900 font-black">{(currentPage - 1) * pageSize + 1}</span> to <span className="text-slate-900 font-black">{Math.min(currentPage * pageSize, displayedRequests.length)}</span> of <span className="text-slate-900 font-black">{displayedRequests.length}</span> requisitions
+                                </div>
+
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        type="button"
+                                        disabled={currentPage === 1}
+                                        onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                        className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                                    >
+                                        <ChevronLeft className="w-3.5 h-3.5" />
+                                        <span>Previous</span>
+                                    </button>
+
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                                         <button
-                                            type="submit"
-                                            disabled={isBooking}
-                                            className={`btn-mmt-primary w-full py-6 flex items-center justify-center gap-4 text-xl tracking-tighter ${isBooking ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                        >
-                                            {isBooking ? (
-                                                <span className="flex items-center gap-3">
-                                                    <span className="h-5 w-5 border-2 border-white/50 border-t-white rounded-full animate-spin" />
-                                                    sending...
-                                                </span>
-                                            ) : (
-                                                <>
-                                                    <span>Send</span>
-                                                    <Ticket className="h-6 w-6" />
-                                                </>
-                                            )}
-                                        </button>
-                                        <button
+                                            key={page}
                                             type="button"
-                                            onClick={() => setSelectedReq(null)}
-                                            className="w-full mt-6 text-[10px] font-black uppercase text-slate-400 tracking-[0.4em] hover:text-[#6366f1] transition-colors"
+                                            onClick={() => { setCurrentPage(page); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                            className={`w-8 h-8 rounded-xl text-xs font-black transition-all ${
+                                                currentPage === page
+                                                    ? 'bg-[#163c8c] text-white shadow-sm shadow-blue-900/20'
+                                                    : 'text-slate-600 hover:bg-slate-100'
+                                            }`}
                                         >
+                                            {page}
                                         </button>
-                                    </div>
-                                </motion.form>
-                            ) : (
-                                <motion.div
-                                    key="placeholder"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="text-center py-24"
-                                >
-                                    <div className="bg-indigo-50 w-32 h-32 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-inner border border-white">
-                                        <Building className="h-14 w-14 text-indigo-300 transform -rotate-12" />
-                                    </div>
-                                    <h4 className="text-2xl font-black text-slate-900 mb-3 tracking-tighter">Ready for Action</h4>
-                                    <p className="text-slate-500 text-sm font-medium leading-relaxed px-6">
-                                        Select a queued request from the system hub to begin official fulfillment and data entry.
-                                    </p>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
+                                    ))}
 
-                    {/* User Management Section Removed - Migrated to Header/UserManagement.jsx */}
+                                    <button
+                                        type="button"
+                                        disabled={currentPage === totalPages}
+                                        onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                        className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                                    >
+                                        <span>Next</span>
+                                        <ChevronRight className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
                 </div>
             </div>
         </div>

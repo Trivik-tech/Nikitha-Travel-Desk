@@ -16,7 +16,7 @@ export const generateTicketPDF = async (request) => {
             <div style="background: linear-gradient(135deg, #008cff 0%, #0056b3 100%); padding: 30px; color: white;">
                 <div style="display: flex; justify-content: space-between; align-items: start;">
                     <div>
-                        <h1 style="margin: 0; font-size: 32px; font-weight: 900; letter-spacing: -1px;">Travel Request</h1>
+                        <h1 style="margin: 0; font-size: 32px; font-weight: 900; letter-spacing: -1px;">Nikitha Travel Request</h1>
                         <p style="margin: 5px 0 0; opacity: 0.8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">Boarding Pass & E-Ticket</p>
                     </div>
                     <div style="text-align: right;">
@@ -90,7 +90,7 @@ export const generateTicketPDF = async (request) => {
                     </div>
                     <div style="text-align: right;">
                         <p style="margin: 0; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Authorized By</p>
-                        <p style="margin: 0; font-size: 12px; font-weight: 700; color: #64748b;">Travel Request Enterprise System</p>
+                        <p style="margin: 0; font-size: 12px; font-weight: 700; color: #64748b;">Nikitha Travel Request Enterprise System</p>
                     </div>
                 </div>
             </div>

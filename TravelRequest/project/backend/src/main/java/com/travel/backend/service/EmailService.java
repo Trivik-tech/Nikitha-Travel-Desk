@@ -204,7 +204,7 @@ public class EmailService {
             sb.append("\nPlease find your ticket attached to this email.\n");
         }
         
-        sb.append("\nSafe travels!\nTravelRequest Team");
+        sb.append("\nSafe travels!\nNikitha Travel Request Team");
         return sb.toString();
     }
 
@@ -219,7 +219,7 @@ public class EmailService {
             sb.append(String.format("Return PNR: %s\n", request.getReturnPnr()));
         }
         
-        sb.append("\nThe ticket file(s) are attached to this email.\n\nRegards,\nTravelRequest System");
+        sb.append("\nThe ticket file(s) are attached to this email.\n\nRegards,\nNikitha Travel Request System");
         return sb.toString();
     }
 
@@ -233,7 +233,7 @@ public class EmailService {
         String otp = generateOtp();
         otpStorage.put(email, new OtpData(otp, System.currentTimeMillis()));
 
-        String subject = "Password Reset OTP - TravelRequest";
+        String subject = "Password Reset OTP - Nikitha Travel Request";
         String body = buildPasswordResetMessage(user.getName(), otp);
 
         logger.info("Sending password reset OTP to: {}", email);
@@ -296,7 +296,7 @@ public class EmailService {
 
     private String buildPasswordResetMessage(String userName, String otp) {
         return String.format(
-            "Hi %s,\n\nYou have requested to reset your password for TravelRequest.\n\nYour OTP is: %s\n\nThis OTP will expire in %d minutes.\n\nIf you didn't request this, please ignore this email.\n\nRegards,\nTravelRequest Team",
+            "Hi %s,\n\nYou have requested to reset your password for Nikitha Travel Request.\n\nYour OTP is: %s\n\nThis OTP will expire in %d minutes.\n\nIf you didn't request this, please ignore this email.\n\nRegards,\nNikitha Travel Request Team",
             userName,
             otp,
             OTP_EXPIRY_MINUTES
